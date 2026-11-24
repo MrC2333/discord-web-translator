@@ -3,7 +3,7 @@
 自动识别 Discord 网页版里的外语消息，并在消息下方追加译文。面向中文用户设计，默认翻译成简体中文，也可切换目标语言。
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.4.5-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.4.6-blue.svg)](CHANGELOG.md)
 [![Manifest V3](https://img.shields.io/badge/Manifest-V3-5865F2.svg)](manifest.json)
 
 > 支持 Chrome / Edge 等 Chromium 内核浏览器（Manifest V3），不适用于 Discord 桌面客户端。
