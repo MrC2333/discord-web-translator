@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Discord 翻译器 — 设置</title>
+  <link rel="stylesheet" href="options.css" />
+</head>
+<body>
+  <div class="page">
+    <header class="head">
+      <div class="logo">译</div>
+      <div>
+        <h1>Discord 外语翻译器</h1>
+        <p>自动翻译 Discord 网页版中的外语消息</p>
+      </div>
+    </header>
+
+    <section class="card">
+      <h2>基础设置</h2>
+
+      <label class="row">
+        <span class="label">启用自动翻译</span>
+        <label class="switch">
+          <input type="checkbox" id="enabled" />
+          <span class="slider"></span>
+        </label>
+      </label>
+
+      <label class="row">
+        <span class="label">目标语言</span>
+        <select id="target"></select>
+      </label>
+
+      <label class="row">
+        <span class="label">翻译源</span>
+        <select id="provider"></select>
+      </label>
+
+      <label class="row">
+        <span class="label">显示页面悬浮开关</span>
+        <label class="switch">
+          <input type="checkbox" id="showFab" />
+          <span class="slider"></span>
+        </label>
+      </label>
+
+      <label class="row">
+        <span class="label">跳过已是目标语言的消息</span>
+        <label class="switch">
+          <input type="checkbox" id="skipSameLang" />
+          <span class="slider"></span>
+        </label>
+      </label>
+
+      <label class="row">
+        <span class="label">选中文字后显示翻译按钮</span>
+        <label class="switch">
+          <input type="checkbox" id="selectionTranslate" />
+          <span class="slider"></span>
+        </label>
+      </label>
+
+      <label class="row">
+        <span class="label">选中后立即翻译（不点按钮）</span>
+        <label class="switch">
+          <input type="checkbox" id="selectionAuto" />
+          <span class="slider"></span>
+        </label>
+      </label>
+    </section>
+
+    <section class="card" id="llmCard">
+      <h2>大模型翻译（推荐，质量最好）</h2>
+      <p class="hint">
+        兼容 OpenAI 接口的服务均可，例如 DeepSeek（<code>https://api.deepseek.com/v1</code>）、
+        OpenAI（<code>https://api.openai.com/v1</code>）或自建服务。
+      </p>
+
+      <label class="row">
+        <span class="label">接口地址 Base URL</span>
+        <input type="url" id="llmBase" placeholder="https://api.deepseek.com/v1" />
+      </label>
+
+      <label class="row">
+        <span class="label">API Key</span>
+        <input type="password" id="llmKey" placeholder="sk-..." autocomplete="off" />
+      </label>
+
+      <label class="row">
+        <span class="label">模型名称</span>
+        <input type="text" id="llmModel" placeholder="deepseek-chat" />
+      </label>
+    </section>
+
+    <section class="card">
+      <h2>更多翻译源（可选，填了自动参与切换）</h2>
+      <p class="hint">
+        DeepL 免费 Key 每月 50 万字符；有道智云国内可直连（需在 openapi.youdao.com 申请）；
+        LibreTranslate 适合自建实例。都不填也不影响免费源使用。
+      </p>
+
+      <label class="row">
+        <span class="label">DeepL API Key</span>
+        <input type="password" id="deeplKey" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx:fx" autocomplete="off" />
+      </label>
+
+      <label class="row">
+        <span class="label">有道 appKey</span>
+        <input type="text" id="youdaoAppKey" placeholder="有道智云应用 ID" />
+      </label>
+
+      <label class="row">
+        <span class="label">有道 appSecret</span>
+        <input type="password" id="youdaoAppSecret" placeholder="有道智云应用密钥" autocomplete="off" />
+      </label>
+
+      <label class="row">
+        <span class="label">LibreTranslate 地址</span>
+        <input type="url" id="libreUrl" placeholder="https://你的实例地址" />
+      </label>
+
+      <label class="row">
+        <span class="label">LibreTranslate API Key（可选）</span>
+        <input type="password" id="libreKey" placeholder="如实例需要" autocomplete="off" />
+      </label>
+    </section>
+
+    <section class="card">
+      <h2>测试与维护</h2>
+      <div class="test-row">
+        <button id="testBtn" class="btn ghost">测试当前翻译源</button>
+        <span id="testResult" class="test-result"></span>
+      </div>
+      <div class="test-row">
+        <button id="clearCache" class="btn ghost">清除翻译缓存</button>
+        <span id="cacheInfo" class="test-result"></span>
+      </div>
+    </section>
+
+    <section class="card notes">
+      <h2>使用说明</h2>
+      <ul>
+        <li>安装后打开 <b>discord.com</b> 并刷新页面即可生效；译文会显示在消息下方，点击「译」可收起。</li>
+        <li>用鼠标选中消息里的文字，会出现「译」按钮，点一下就能翻译选中的内容（可在上方改为「选中即翻译」）。</li>
+        <li>回复消息里引用的内容也会单独翻译，显示在引用行下方。</li>
+        <li>「自动」模式会按 Google → 腾讯翻译君 → Bing → MyMemory →（已配置的 DeepL/有道/LibreTranslate/大模型）依次切换，一个不可用就自动换下一个。</li>
+        <li>腾讯翻译君不支持俄语等部分语种；这类消息建议使用 Google（需代理）、有道智云或大模型。</li>
+        <li>消息内容只会发送给所选的翻译服务，扩展不会上传其它数据；缓存仅保存在本地。</li>
+      </ul>
+    </section>
+
+    <footer class="foot">
+      <button id="saveBtn" class="btn primary">保存设置</button>
+      <span id="saveHint" class="save-hint"></span>
+    </footer>
+  </div>
+
+  <script src="../shared/langs.js"></script>
+  <script src="options.js"></script>
+</body>
+</html>

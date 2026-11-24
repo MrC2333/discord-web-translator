@@ -1,0 +1,15 @@
+{
+  "name": "discord-web-translator",
+  "version": "1.4.5",
+  "private": true,
+  "description": "Discord 网页版外语消息翻译浏览器扩展（Chrome / Edge，Manifest V3）",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "node test/validate.cjs && node test/background.test.cjs",
+    "test:e2e": "node test/e2e-extension.mjs",
+    "preview": "node tools/gen-preview.cjs"
+  }
+}

@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Discord 翻译器</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <header class="head">
+    <div class="logo">译</div>
+    <div class="title">
+      <h1>Discord 翻译器</h1>
+      <p id="sub">自动翻译外语消息</p>
+    </div>
+    <label class="switch" title="自动翻译开关">
+      <input type="checkbox" id="enabled" />
+      <span class="slider"></span>
+    </label>
+  </header>
+
+  <main class="body">
+    <label class="field">
+      <span>目标语言</span>
+      <select id="target"></select>
+    </label>
+
+    <label class="field">
+      <span>翻译源</span>
+      <select id="provider"></select>
+    </label>
+
+    <div class="actions">
+      <button id="translateAll" class="btn primary">翻译当前页消息</button>
+    </div>
+    <div class="actions">
+      <button id="diagnose" class="btn ghost">复制诊断信息（排查用）</button>
+    </div>
+
+    <p id="status" class="status">正在检测 Discord 页面…</p>
+  </main>
+
+  <footer class="foot">
+    <a href="#" id="openOptions">⚙ 更多设置</a>
+    <span class="ver">v1.4.5</span>
+  </footer>
+
+  <script src="../shared/langs.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

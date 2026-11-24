@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>Mock Discord — DXT 测试页</title>
+  <link rel="stylesheet" href="../content/content.css" />
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; background: #313338; color: #dbdee1;
+      font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif; font-size: 15px;
+    }
+    .toolbar {
+      position: sticky; top: 0; z-index: 10; display: flex; gap: 8px;
+      padding: 10px 16px; background: #1e1f22; border-bottom: 1px solid #111214;
+      font-size: 12px; align-items: center;
+    }
+    .toolbar button {
+      background: #404249; color: #fff; border: none; border-radius: 4px;
+      padding: 6px 10px; cursor: pointer; font-size: 12px;
+    }
+    .toolbar button:hover { background: #5865f2; }
+    #chat {
+      max-width: 820px; margin: 0 auto; padding: 16px 20px 120px;
+      list-style: none;
+    }
+    li.message {
+      display: grid; grid-template-columns: 48px 1fr; gap: 12px;
+      padding: 8px 0 2px; position: relative;
+    }
+    .avatar {
+      grid-column: 1; width: 40px; height: 40px; border-radius: 50%;
+      background: linear-gradient(135deg, #5865f2, #eb459e); margin-top: 2px;
+    }
+    .col { grid-column: 2; min-width: 0; }
+    .header { font-size: 15px; margin: 0 0 2px; }
+    .header .name { font-weight: 600; color: #f2f3f5; }
+    .header .time { font-size: 11px; color: #949ba4; margin-left: 8px; font-weight: 400; }
+    .messageContent_abcdef {
+      line-height: 1.375; white-space: pre-wrap; word-wrap: break-word;
+      user-select: text; color: #dbdee1;
+    }
+    .mention { background: rgba(88, 101, 242, .3); color: #c9cdfb; border-radius: 3px; padding: 0 2px; }
+    .inline { background: #2b2d31; border-radius: 3px; padding: 0 3px; font-family: Consolas, monospace; font-size: 13px; }
+    pre { background: #2b2d31; border-radius: 6px; padding: 8px 10px; margin: 4px 0; overflow-x: auto; }
+    pre code { font-family: Consolas, monospace; font-size: 13px; white-space: pre; }
+    .repliedMessage_demo {
+      font-size: 12px; color: #949ba4; margin-bottom: 2px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .replyAuthor_demo { color: #c9cdfb; font-weight: 600; }
+    .edited_demo { font-size: 10px; color: #949ba4; font-style: italic; }
+    .tooltip_demo { display: none; }
+    .spoiler { background: #202225; color: #202225; border-radius: 3px; padding: 0 2px; cursor: pointer; }
+    .emoji { width: 22px; height: 22px; vertical-align: -4px; }
+    .grouped .header { display: none; }
+    .grouped { padding-top: 1px; }
+  </style>
+</head>
+<body>
+  <div class="toolbar">
+    <b>Mock Discord 测试台</b>
+    <button id="btnAdd">＋ 新消息（外语）</button>
+    <button id="btnEdit">✎ 编辑第 1 条</button>
+    <button id="btnRecycle">⟳ 模拟频道切换</button>
+    <button id="btnClear">清空译文节点</button>
+    <span id="log" style="color:#949ba4"></span>
+  </div>
+
+  <ol id="chat">
+    <li id="chat-messages-900" class="message">
+      <div class="avatar"></div>
+      <div class="col">
+        <h3 class="header"><span class="name">Alice</span><span class="time">今天 10:02</span></h3>
+        <div id="message-content-900" class="messageContent_abcdef">Hey everyone, the new season starts next week. Are you ready for the update?</div>
+      </div>
+    </li>
+
+    <li id="chat-messages-920" class="message">
+      <div class="avatar"></div>
+      <div class="col">
+        <div id="message-reply-context-920" class="repliedMessage_demo">
+          <span class="replyText_demo">Replying to</span>
+          <span class="replyAuthor_demo">@Alice</span>
+          <div id="message-content-921" class="messageContent_abcdef replySnippet_demo">the new season starts next week</div>
+        </div>
+        <h3 class="header"><span class="name">Zoe</span><span class="time">今天 10:10</span></h3>
+        <div id="message-content-920" class="messageContent_abcdef">Yes! I already bought the pass, see you there.</div>
+      </div>
+    </li>    <li id="chat-messages-901" class="message">
+      <div class="avatar"></div>
+      <div class="col">
+        <h3 class="header"><span class="name">Yuki</span><span class="time">今天 10:03</span></h3>
+        <div id="message-content-901" class="messageContent_abcdef">こんにちは！新しいシーズンをとても楽しみにしています。</div>
+      </div>
+    </li>
+
+    <li id="chat-messages-930" class="message">
+      <div class="avatar"></div>
+      <div class="col">
+        <h3 class="header"><span class="name">Alice</span><span class="time">今天 10:03</span></h3>
+        <div id="message-content-930" class="messageContent_abcdef">ok <span class="edited_demo">(已编辑)</span></div>
+      </div>
+    </li>
+
+    <li id="chat-messages-931" class="message">
+      <div class="avatar"></div>
+      <div class="col">
+        <h3 class="header"><span class="name">Dmitri</span><span class="time">今天 10:04</span></h3>
+        <div id="message-content-931" class="messageContent_abcdef">Спасибо всем за игру! <span class="edited_demo">(已编辑)</span></div>
+      </div>
+    </li>
+
+    <li id="chat-messages-932" class="message">
+      <div class="avatar"></div>
+      <div class="col">
+        <h3 class="header"><span class="name">Dmitri</span><span class="time">今天 10:04</span></h3>
+        <div id="message-content-932" class="messageContent_abcdef"><span class="edited_demo">Привет! Как дела? (已编辑)</span></div>
+      </div>
+    </li>
+
+    <li id="chat-messages-933" class="message">
+      <div class="avatar"></div>
+      <div class="col">
+        <h3 class="header"><span class="name">Test</span><span class="time">今天 10:11</span></h3>
+        <div id="message-content-933" class="messageContent_abcdef">TRIGGER_FAIL please ignore</div>
+      </div>
+    </li>
+
+    <li id="chat-messages-934" class="message">
+      <div class="avatar"></div>
+      <div class="col">
+        <h3 class="header"><span class="name">Alice</span><span class="time">今天 10:12</span></h3>
+        <div id="message-content-934" class="messageContent_abcdef">Good <span class="edited_demo">(已编辑)<span class="tooltip_demo">2026年11月24日星期二 19:23</span></span></div>
+      </div>
+    </li>
+
+    <li id="chat-messages-902" class="message">
+      <div class="avatar"></div>
+      <div class="col">
+        <h3 class="header"><span class="name">Dmitri</span><span class="time">今天 10:04</span></h3>
+        <div id="message-content-902" class="messageContent_abcdef">Привет всем! Я из России, рад познакомиться с вами.</div>
+      </div>
+    </li>
+
+    <li id="chat-messages-903" class="message">
+      <div class="avatar"></div>
+      <div class="col">
+        <h3 class="header"><span class="name">小明</span><span class="time">今天 10:05</span></h3>
+        <div id="message-content-903" class="messageContent_abcdef">大家好，这条是中文，不应该被翻译。</div>
+      </div>
+    </li>
+
+    <li id="chat-messages-904" class="message">
+      <div class="avatar"></div>
+      <div class="col">
+        <h3 class="header"><span class="name">Bob</span><span class="time">今天 10:06</span></h3>
+        <div id="message-content-904" class="messageContent_abcdef">🎉🎉🎉</div>
+      </div>
+    </li>
+
+    <li id="chat-messages-905" class="message">
+      <div class="avatar"></div>
+      <div class="col">
+        <h3 class="header"><span class="name">Carol</span><span class="time">今天 10:07</span></h3>
+        <div id="message-content-905" class="messageContent_abcdef">https://example.com/news/update</div>
+      </div>
+    </li>
+
+    <li id="chat-messages-906" class="message">
+      <div class="avatar"></div>
+      <div class="col">
+        <h3 class="header"><span class="name">Alice</span><span class="time">今天 10:08</span></h3>
+        <div id="message-content-906" class="messageContent_abcdef"><@123456789> the <span class="inline">/join</span> command is broken for me, can someone check the logs? <img class="emoji" alt=":pepe:" src="data:image/gif;base64,R0lGODlhAQABAAAAACw="> <span class="spoiler">secret spoiler text</span></div>
+      </div>
+    </li>
+
+    <li id="chat-messages-907" class="message grouped">
+      <div class="avatar"></div>
+      <div class="col">
+        <div id="message-content-907" class="messageContent_abcdef">Also, the patch notes are here: https://example.com/patch — check them out!</div>
+      </div>
+    </li>
+
+    <li id="chat-messages-908" class="message">
+      <div class="avatar"></div>
+      <div class="col">
+        <h3 class="header"><span class="name">Eve</span><span class="time">今天 10:09</span></h3>
+        <div id="message-content-908" class="messageContent_abcdef">
+          <pre><code>const answer = 42; // 这段代码不应该被翻译破坏</code></pre>
+          Please review this snippet when you have time.
+        </div>
+      </div>
+    </li>
+  </ol>
+
+  <script src="harness.js"></script>
+  <script src="../content/content.js"></script>
+  <script>
+    window.__dxtLog = (t) => { document.getElementById('log').textContent = t; };
+
+    document.getElementById('btnAdd').addEventListener('click', () => {
+      const n = (window.__mockSeq = (window.__mockSeq || 909) + 1);
+      const li = document.createElement('li');
+      li.id = 'chat-messages-' + n;
+      li.className = 'message';
+      li.innerHTML =
+        '<div class="avatar"></div><div class="col">' +
+        '<h3 class="header"><span class="name">NewUser</span><span class="time">刚刚</span></h3>' +
+        '<div id="message-content-' + n + '" class="messageContent_abcdef">Good morning! Can anyone help me with the quest on the second island?</div>' +
+        '</div>';
+      document.getElementById('chat').appendChild(li);
+      window.__dxtLog('已新增消息 ' + n);
+    });
+
+    document.getElementById('btnEdit').addEventListener('click', () => {
+      const c = document.getElementById('message-content-900');
+      c.textContent = 'EDIT: the season was delayed to next month, sorry everyone.';
+      window.__dxtLog('已编辑第 1 条消息');
+    });
+
+    document.getElementById('btnRecycle').addEventListener('click', () => {
+      const chat = document.getElementById('chat');
+      // 模拟虚拟列表：卸载节点，再以「全新、无译文」的节点重建
+      const clones = Array.from(chat.children).map((it) => {
+        const clone = it.cloneNode(true);
+        clone.querySelectorAll('.dxt-trans').forEach((n) => n.remove());
+        clone.querySelectorAll('[data-dxt-state]').forEach((n) => {
+          delete n.dataset.dxtState;
+          delete n.dataset.dxtFailAt;
+        });
+        return clone;
+      });
+      chat.innerHTML = '';
+      window.__dxtLog('已清空消息列表（模拟虚拟列表回收）');
+      setTimeout(() => {
+        clones.forEach((it) => chat.appendChild(it));
+        window.__dxtLog('已用全新节点重新挂载');
+      }, 400);
+    });
+
+    document.getElementById('btnClear').addEventListener('click', () => {
+      document.querySelectorAll('.dxt-trans').forEach((n) => n.remove());
+      window.__dxtLog('已手动清空译文节点（用于观察重建）');
+    });
+  </script>
+</body>
+</html>
+
+
+

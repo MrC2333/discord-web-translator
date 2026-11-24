@@ -1,0 +1,35 @@
+/* 语言列表：弹窗与设置页共用 */
+window.DXT_LANGS = [
+  { code: 'zh-CN', label: '简体中文' },
+  { code: 'zh-TW', label: '繁體中文' },
+  { code: 'en', label: 'English' },
+  { code: 'ja', label: '日本語' },
+  { code: 'ko', label: '한국어' },
+  { code: 'ru', label: 'Русский' },
+  { code: 'fr', label: 'Français' },
+  { code: 'de', label: 'Deutsch' },
+  { code: 'es', label: 'Español' },
+  { code: 'pt-BR', label: 'Português (Brasil)' },
+  { code: 'it', label: 'Italiano' },
+  { code: 'ar', label: 'العربية' },
+  { code: 'tr', label: 'Türkçe' },
+  { code: 'th', label: 'ไทย' },
+  { code: 'vi', label: 'Tiếng Việt' },
+  { code: 'id', label: 'Bahasa Indonesia' },
+  { code: 'hi', label: 'हिन्दी' },
+  { code: 'pl', label: 'Polski' },
+  { code: 'nl', label: 'Nederlands' },
+  { code: 'uk', label: 'Українська' },
+];
+
+window.DXT_PROVIDERS = [
+  { value: 'auto', label: '自动（按可用性依次切换）' },
+  { value: 'google', label: 'Google 翻译' },
+  { value: 'tencent', label: '腾讯翻译君（国内可用）' },
+  { value: 'bing', label: 'Bing 翻译' },
+  { value: 'mymemory', label: 'MyMemory（免费额度有限）' },
+  { value: 'deepl', label: 'DeepL（需 API Key）' },
+  { value: 'youdao', label: '有道智云（需 Key，国内直连）' },
+  { value: 'libre', label: 'LibreTranslate（自建实例）' },
+  { value: 'llm', label: '大模型（DeepSeek / OpenAI 兼容）' },
+];
