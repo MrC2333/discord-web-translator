@@ -42,6 +42,11 @@
     ],
     ['ok', '好的', 'en'],
     ['Good', '好', 'en'],
+    [
+      'New patch notes are live The update brings a new map and balance changes. Read more on the website.',
+      '新补丁说明已上线。本次更新带来一张新地图和平衡性调整，更多内容请见官网。',
+      'en',
+    ],
     ['Спасибо всем за игру!', '谢谢大家陪我玩！', 'ru'],
     ['Привет! Как дела?', '你好！最近怎么样？', 'ru'],
     [
@@ -67,10 +72,11 @@
   ];
 
   function fakeTranslate(text) {
+    const hay = String(text || '').replace(/\s+/g, ' ').trim();
     // 长 key 优先，避免短句抢先匹配
     const sorted = [...MAP].sort((a, b) => b[0].length - a[0].length);
     for (const [src, dst, lang] of sorted) {
-      if (text.indexOf(src) !== -1) return { text: dst, lang };
+      if (hay.indexOf(src) !== -1) return { text: dst, lang };
     }
     return { text: '【译文】' + text, lang: 'auto' };
   }

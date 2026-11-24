@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Discord 外语翻译器",
   "short_name": "DXT",
-  "version": "1.4.5",
+  "version": "1.4.6",
   "description": "自动把 Discord 网页版里的外语消息翻译成你的语言，支持 Google、Bing、MyMemory 与自定义大模型。",
   "minimum_chrome_version": "116",
   "permissions": ["storage"],

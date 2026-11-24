@@ -243,11 +243,12 @@ async function httpJson(url) {
           '<li id="chat-messages-777002"><div id="message-content-777002" class="messageContent_e2e" style="user-select:text">こんにちは！新しいシーズンを楽しみにしています。</div></li>' +
           '<li id="chat-messages-777003"><div id="message-reply-context-777003" class="repliedMessage_e2e" style="font-size:12px;color:#949ba4;user-select:text"><span>Replying to @Alice</span><div id="message-content-777004" class="messageContent_e2e" style="user-select:text">the new season starts next week</div></div><div id="message-content-777003" class="messageContent_e2e" style="user-select:text">Yes! I already bought the pass, see you there.</div></li>' +
           '<li id="chat-messages-777005"><div id="message-content-777005" class="messageContent_e2e" style="user-select:text">ok <span class="edited_abc" aria-label="已编辑">(已编辑)</span></div></li>' +
+          '<li id="chat-messages-777006"><div id="message-content-777006" class="messageContent_e2e" style="user-select:text"></div><div class="embedWrapper_e2e" style="border-left:3px solid #5865f2;background:#2b2d31;border-radius:4px;padding:8px;max-width:480px"><div class="embedTitle_e2e">Server update is live</div><div class="embedDescription_e2e">New features and bug fixes are available now.</div></div></li>' +
           '</ol>';
         document.body.appendChild(host);
         return true;
       })()`);
-      await sleep(8000);
+      await sleep(9000);
       const injectedMsgs = await cdp.eval(`(() => {
         const rows = Array.from(document.querySelectorAll('#dxt-e2e-host li[id^="chat-messages-"]')).map((li) => {
           const contents = Array.from(li.querySelectorAll('[id^="message-content-"]')).map((c) => {
@@ -260,7 +261,13 @@ async function httpJson(url) {
               quote: qt ? qt.textContent : '',
             };
           });
-          return { id: li.id, contents };
+          const embeds = Array.from(li.querySelectorAll('[class*="embedWrapper"]')).map((e) => {
+            const next = e.nextElementSibling;
+            return {
+              trans: next && next.classList.contains('dxt-embed-trans') ? next.textContent : '',
+            };
+          });
+          return { id: li.id, contents, embeds };
         });
         return rows;
       })()`);
@@ -269,8 +276,9 @@ async function httpJson(url) {
         injectedMsgs.some((r) => r.contents.some((c) => c.id.endsWith(id) && c.text && !c.text.includes('已编辑')))
       );
       const quoteOk = injectedMsgs.some((r) => r.contents.some((c) => c.quote));
-      const allOk = injectedMsgs.length === 4 && bodiesOk && quoteOk;
-      record(allOk, '真实 discord.com 页面消息翻译（含引用正文、已编辑消息）', JSON.stringify(injectedMsgs).slice(0, 320));
+      const embedOk = injectedMsgs.some((r) => r.embeds.some((e) => e.trans));
+      const allOk = injectedMsgs.length === 5 && bodiesOk && quoteOk && embedOk;
+      record(allOk, '真实 discord.com 页面翻译（引用正文/已编辑/链接卡片）', JSON.stringify(injectedMsgs).slice(0, 340));
       if (allOk) await cdp.screenshot(path.join(__dirname, 'shot-discord-translated.png'));
 
       // 7) 批量吞吐测试：再注入 10 条消息，统计全部翻译完成耗时

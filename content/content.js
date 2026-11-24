@@ -16,8 +16,11 @@
   const MSG_SEL = '[id^="chat-messages-"]';
   const CONTENT_SEL = '[id^="message-content-"]';
   const QUOTE_SEL = '[id^="message-reply-context-"]';
+  // 链接预览 / 机器人卡片
+  const EMBED_SEL = '[class*="embedWrapper"], [class*="embedFull"], [class*="embedCard"]';
   const TRANS_CLS = 'dxt-trans';
   const QUOTE_TRANS_CLS = 'dxt-quote-trans';
+  const EMBED_TRANS_CLS = 'dxt-embed-trans';
 
   const DEFAULTS = {
     enabled: true,
@@ -65,6 +68,8 @@
         // 「(已编辑)」标记常带隐藏的编辑时间（如 2026年11月24日…）：
         // 这些都不是消息内容，剔除，否则短消息会被误判/翻译成原样
         if (skipUiNoise && cls && /edited|timestamp|tooltip/i.test(cls)) return;
+        // embed 的作者名/页脚通常是站点名或日期，翻译没有意义
+        if (cls && /embedAuthor|embedFooter|embedProvider/i.test(cls)) return;
         const tag = el.tagName;
         if (tag === 'IMG') {
           const alt = el.getAttribute('alt') || '';
@@ -398,6 +403,56 @@
     }
   }
 
+  /* ---------------- 链接预览 / 机器人卡片（embed）翻译 ---------------- */
+
+  function renderEmbed(embedEl, source, translated) {
+    const block = document.createElement('div');
+    block.className = EMBED_TRANS_CLS;
+    block.textContent = '译 ' + translated;
+    block.title = '链接预览/卡片的翻译';
+    sources.set(block, source);
+    embedEl.insertAdjacentElement('afterend', block);
+  }
+
+  async function processEmbed(el, force = false) {
+    if (!alive || !el || !el.isConnected) return;
+    if (el.dataset.dxtState === 'busy' || el.dataset.dxtState === 'done') return;
+    if (!force && !settings.enabled) return;
+
+    const text = extractText(el);
+    if (!text || countLetters(text) < 4) {
+      el.dataset.dxtState = 'skip';
+      return;
+    }
+    if (settings.skipSameLang !== false && isSameLanguage(text)) {
+      el.dataset.dxtState = 'skip';
+      return;
+    }
+
+    const gen = generation;
+    const priority = isVisible(el);
+    el.dataset.dxtState = 'busy';
+    try {
+      const res = await requestTranslation(text, priority);
+      if (!alive || gen !== generation) return;
+      if (!res || !res.ok) {
+        el.dataset.dxtState = 'skip';
+        return;
+      }
+      const translated = String(res.text || '').trim();
+      if (!translated || normalize(translated) === normalize(text)) {
+        el.dataset.dxtState = 'done';
+        return;
+      }
+      renderEmbed(el, text, translated);
+      el.dataset.dxtState = 'done';
+      stats.translated++;
+      updateFab();
+    } catch {
+      el.dataset.dxtState = 'skip';
+    }
+  }
+
   /* ---------------- 选中文本翻译（划词） ---------------- */
 
   let selPill = null;
@@ -673,10 +728,11 @@
     const list = li.querySelectorAll(CONTENT_SEL);
     if (list.length) {
       for (const c of list) processContentEl(c, force);
-      return;
+    } else {
+      const fallback = findContent(li);
+      if (fallback) processContentEl(fallback, force);
     }
-    const fallback = findContent(li);
-    if (fallback) processContentEl(fallback, force);
+    li.querySelectorAll(EMBED_SEL).forEach((e) => processEmbed(e, force));
   }
 
   /** 解除失败锁定并重扫：成功一次 / 切回标签页时调用 */
@@ -713,6 +769,7 @@
   function clearTranslations() {
     document.querySelectorAll('.' + TRANS_CLS).forEach((n) => n.remove());
     document.querySelectorAll('.' + QUOTE_TRANS_CLS).forEach((n) => n.remove());
+    document.querySelectorAll('.' + EMBED_TRANS_CLS).forEach((n) => n.remove());
     document.querySelectorAll('[data-dxt-state]').forEach((n) => {
       delete n.dataset.dxtState;
       delete n.dataset.dxtFailAt;
@@ -759,10 +816,23 @@
       id: li.id,
       reply: !!li.querySelector(QUOTE_SEL),
       contents: Array.from(li.querySelectorAll(CONTENT_SEL)).map(diagnoseContent),
+      embeds: Array.from(li.querySelectorAll(EMBED_SEL)).map((e) => {
+        const text = extractText(e);
+        const next = e.nextElementSibling;
+        return {
+          state: e.dataset.dxtState || '',
+          len: text.length,
+          hasTrans: !!(next && next.classList && next.classList.contains(EMBED_TRANS_CLS)),
+          preview: text.slice(0, 32),
+        };
+      }),
     }));
     // 重点收集「没译文」的行，再附上最近几条，便于定位个例
     const problems = all.filter(
-      (r) => r.contents.length === 0 || r.contents.some((c) => !c.hasTrans && c.state !== 'skip')
+      (r) =>
+        r.contents.length === 0 ||
+        r.contents.some((c) => !c.hasTrans && c.state !== 'skip') ||
+        r.embeds.some((e) => !e.hasTrans && e.state !== 'skip')
     );
     const tail = all.slice(-5);
     const picked = [];
@@ -777,6 +847,10 @@
     for (const r of all) {
       for (const c of r.contents) {
         const k = c.hasTrans ? 'translated' : c.reason || c.state || 'unknown';
+        reasonCount[k] = (reasonCount[k] || 0) + 1;
+      }
+      for (const e of r.embeds) {
+        const k = e.hasTrans ? 'embed-translated' : e.state || 'embed-empty';
         reasonCount[k] = (reasonCount[k] || 0) + 1;
       }
     }
@@ -799,6 +873,8 @@
         contents: document.querySelectorAll(CONTENT_SEL).length,
         translated: document.querySelectorAll('.' + TRANS_CLS).length,
         quoteTranslated: document.querySelectorAll('.' + QUOTE_TRANS_CLS).length,
+        embeds: document.querySelectorAll(EMBED_SEL).length,
+        embedTranslated: document.querySelectorAll('.' + EMBED_TRANS_CLS).length,
       },
       reasons: reasonCount,
       rows,
@@ -811,6 +887,7 @@
     // 直接按内容节点扫描：回复消息里被引用的正文与回复正文是两个独立节点
     document.querySelectorAll(CONTENT_SEL).forEach((c) => processContentEl(c, force));
     document.querySelectorAll(QUOTE_SEL).forEach((q) => processQuote(q, force));
+    document.querySelectorAll(EMBED_SEL).forEach((e) => processEmbed(e, force));
   }
 
   /* ---------------- 编辑检测 ---------------- */
@@ -858,6 +935,7 @@
           if (n.nodeType !== 1) continue;
           if (n.matches && n.matches(CONTENT_SEL)) processContentEl(n);
           if (n.matches && n.matches(QUOTE_SEL)) processQuote(n);
+          if (n.matches && n.matches(EMBED_SEL)) processEmbed(n);
           if (n.matches && n.matches(MSG_SEL)) {
             scheduleProcess(n);
             continue;
@@ -868,6 +946,7 @@
             if (!inner.length) {
               n.querySelectorAll(CONTENT_SEL).forEach((c) => processContentEl(c));
               n.querySelectorAll(QUOTE_SEL).forEach((q) => processQuote(q));
+              n.querySelectorAll(EMBED_SEL).forEach((e) => processEmbed(e));
             }
           }
         }

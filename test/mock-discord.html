@@ -52,6 +52,14 @@
     .replyAuthor_demo { color: #c9cdfb; font-weight: 600; }
     .edited_demo { font-size: 10px; color: #949ba4; font-style: italic; }
     .tooltip_demo { display: none; }
+    .embedWrapper_demo {
+      border-left: 3px solid #5865f2; background: #2b2d31; border-radius: 4px;
+      padding: 8px 10px; margin-top: 4px; max-width: 520px;
+    }
+    .embedAuthor_demo { font-size: 12px; color: #b5bac1; }
+    .embedTitle_demo { color: #00a8fc; font-weight: 600; margin-top: 2px; }
+    .embedDescription_demo { font-size: 13px; color: #dbdee1; margin-top: 2px; }
+    .embedFooter_demo { font-size: 11px; color: #949ba4; margin-top: 4px; }
     .spoiler { background: #202225; color: #202225; border-radius: 3px; padding: 0 2px; cursor: pointer; }
     .emoji { width: 22px; height: 22px; vertical-align: -4px; }
     .grouped .header { display: none; }
@@ -133,6 +141,20 @@
       <div class="col">
         <h3 class="header"><span class="name">Alice</span><span class="time">今天 10:12</span></h3>
         <div id="message-content-934" class="messageContent_abcdef">Good <span class="edited_demo">(已编辑)<span class="tooltip_demo">2026年11月24日星期二 19:23</span></span></div>
+      </div>
+    </li>
+
+    <li id="chat-messages-940" class="message">
+      <div class="avatar"></div>
+      <div class="col">
+        <h3 class="header"><span class="name">NewsBot</span><span class="time">今天 10:13</span></h3>
+        <div id="message-content-940" class="messageContent_abcdef"></div>
+        <div class="embedWrapper_demo">
+          <div class="embedAuthor_demo">SomeBot</div>
+          <div class="embedTitle_demo">New patch notes are live</div>
+          <div class="embedDescription_demo">The update brings a new map and balance changes. Read more on the website.</div>
+          <div class="embedFooter_demo">Website</div>
+        </div>
       </div>
     </li>
 

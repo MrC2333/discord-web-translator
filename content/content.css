@@ -212,8 +212,7 @@
   color: #f23f43;
 }
 
-/* ---------- 回复引用（被引用消息正文）的译文 ---------- */
-.dxt-quote-trans {
+/* ---------- 回复引用（被引用消息正文）的译文 ---------- */.dxt-quote-trans {
   display: inline-block;
   margin-top: 2px;
   margin-left: 4px;
@@ -229,4 +228,22 @@
   word-break: break-word;
   user-select: text;
   vertical-align: middle;
+}
+
+/* ---------- 链接预览 / 机器人卡片的译文 ---------- */
+.dxt-embed-trans {
+  display: block;
+  margin: 4px 0 6px 4px;
+  padding: 3px 8px;
+  border-left: 2px solid rgba(88, 101, 242, 0.65);
+  background: rgba(88, 101, 242, 0.12);
+  border-radius: 3px;
+  font-size: 0.93em;
+  line-height: 1.45;
+  color: var(--text-normal, #dbdee1);
+  width: fit-content;
+  max-width: 100%;
+  white-space: pre-wrap;
+  word-break: break-word;
+  user-select: text;
 }

@@ -185,7 +185,7 @@ git remote add origin https://github.com/<your-name>/discord-web-translator.git
 git push -u origin main
 ```
 
-打 Release 时，把仓库根目录打包为 `discord-translator-1.4.5.zip`（包含 `manifest.json` 及其引用文件即可）上传到 Releases。CI 会在 push/PR 时自动运行 `npm test`。
+打 Release 时，把仓库根目录打包为 `discord-translator-1.4.6.zip`（包含 `manifest.json` 及其引用文件即可）上传到 Releases。CI 会在 push/PR 时自动运行 `npm test`。
 
 ---
 
