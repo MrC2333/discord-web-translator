@@ -139,6 +139,20 @@ check('内容脚本的 Discord 选择器与测试页一致', () => {
   return '选择器一致';
 });
 
+check('Telegram K/A 选择器与模拟页一致', () => {
+  const js = fs.readFileSync(path.join(ROOT, 'content/content.js'), 'utf8');
+  must(js.includes('.bubble[data-mid]'), '缺少 Telegram K 气泡选择器');
+  must(js.includes("'[data-message-id]'"), '缺少 Telegram A 消息选择器');
+  must(js.includes('.message-content'), '缺少 Telegram A 正文选择器');
+  const k = fs.readFileSync(path.join(ROOT, 'test/mock-telegram-k.html'), 'utf8');
+  const a = fs.readFileSync(path.join(ROOT, 'test/mock-telegram-a.html'), 'utf8');
+  must(k.includes('data-mid='), 'Telegram K 模拟页缺少 data-mid');
+  must(a.includes('data-message-id='), 'Telegram A 模拟页缺少 data-message-id');
+  must(k.includes('dxt-site'), 'Telegram K 模拟页缺少站点标识');
+  must(a.includes('dxt-site'), 'Telegram A 模拟页缺少站点标识');
+  return 'K/A 一致';
+});
+
 console.log('');
 for (const c of checks) {
   console.log((c.ok ? '✓ ' : '✗ ') + c.name + (c.detail ? ' — ' + c.detail : ''));

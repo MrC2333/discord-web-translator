@@ -248,8 +248,9 @@ async function httpJson(url) {
         document.body.appendChild(host);
         return true;
       })()`);
-      await sleep(9000);
-      const injectedMsgs = await cdp.eval(`(() => {
+      // 轮询等待翻译完成（网络波动时固定 sleep 容易读到 busy）
+      const readInjected = () =>
+        cdp.eval(`(() => {
         const rows = Array.from(document.querySelectorAll('#dxt-e2e-host li[id^="chat-messages-"]')).map((li) => {
           const contents = Array.from(li.querySelectorAll('[id^="message-content-"]')).map((c) => {
             const t = c.querySelector('.dxt-trans');
@@ -271,6 +272,18 @@ async function httpJson(url) {
         });
         return rows;
       })()`);
+      let injectedMsgs = [];
+      const waitDeadline = Date.now() + 70000;
+      while (Date.now() < waitDeadline) {
+        await sleep(1500);
+        injectedMsgs = await readInjected();
+        const settled = injectedMsgs.every(
+          (r) =>
+            r.contents.every((c) => c.state !== 'busy' && c.state !== '') && r.embeds.every(() => true)
+        );
+        const hasTrans = injectedMsgs.some((r) => r.contents.some((c) => c.text));
+        if (settled && hasTrans) break;
+      }
       const bodyIds = ['777001', '777002', '777003', '777005'];
       const bodiesOk = bodyIds.every((id) =>
         injectedMsgs.some((r) => r.contents.some((c) => c.id.endsWith(id) && c.text && !c.text.includes('已编辑')))
@@ -309,7 +322,7 @@ async function httpJson(url) {
       })()`);
       const t0 = Date.now();
       let done = 0;
-      while (Date.now() - t0 < 30000) {
+      while (Date.now() - t0 < 60000) {
         done = await cdp.eval(`document.querySelectorAll('#dxt-perf-host .dxt-trans').length`);
         if (done >= 10) break;
         await sleep(250);
@@ -378,6 +391,33 @@ async function httpJson(url) {
             : '无结果卡片'
           : '未出现按钮（选区长度 ' + selected + '）'
       );
+    }
+
+    // 9) Telegram Web K：注入假消息验证站点适配
+    await cdp.send('Page.navigate', { url: 'https://web.telegram.org/k/' });
+    await sleep(8000);
+    let tgFab = false;
+    try {
+      tgFab = await cdp.eval(`!!document.querySelector('.dxt-fab')`);
+    } catch {
+      /* ignore */
+    }
+    if (tgFab) {
+      await cdp.eval(`(() => {
+        const host = document.createElement('div');
+        host.id = 'dxt-tg-host';
+        host.style.cssText = 'position:fixed;left:20px;top:20px;width:520px;background:#0e1621;padding:12px;z-index:99999;border-radius:8px;';
+        host.innerHTML = '<div class="bubbles"><div class="bubble" data-mid="tg-1"><div class="bubble-content"><div class="message">Hello from Telegram, this message should be translated.</div></div></div></div>';
+        document.body.appendChild(host);
+        return true;
+      })()`);
+      await sleep(7000);
+      const tgRes = await cdp.eval(
+        `(() => { const t = document.querySelector('#dxt-tg-host .dxt-trans'); return t ? t.textContent : ''; })()`
+      );
+      record(!!tgRes, 'Telegram Web K 翻译注入', tgRes.slice(0, 60) || '无译文');
+    } else {
+      record(false, 'Telegram Web K 翻译注入', '内容脚本未注入（页面可能未加载或被拦截）');
     }
 
     // 6) 控制台错误收集（提前开启太麻烦，这里看扩展页面自身是否干净）

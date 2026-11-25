@@ -22,6 +22,20 @@
   const QUOTE_TRANS_CLS = 'dxt-quote-trans';
   const EMBED_TRANS_CLS = 'dxt-embed-trans';
 
+  // Telegram Web：K（web.telegram.org/k）与 A（web.telegram.org/a）
+  const TG_K_ROW = '.bubble[data-mid]:not(.is-date)';
+  const TG_A_ROW = '[data-message-id]';
+  const SITE = (() => {
+    const meta = document.querySelector('meta[name="dxt-site"]');
+    if (meta && meta.content) return meta.content;
+    const h = location.hostname;
+    if (h.endsWith('discord.com')) return 'discord';
+    if (h === 'web.telegram.org' || h.endsWith('.telegram.org')) {
+      return location.pathname.startsWith('/a/') ? 'telegram-a' : 'telegram-k';
+    }
+    return 'other';
+  })();
+
   const DEFAULTS = {
     enabled: true,
     target: 'zh-CN',
@@ -70,7 +84,23 @@
         if (skipUiNoise && cls && /edited|timestamp|tooltip/i.test(cls)) return;
         // embed 的作者名/页脚通常是站点名或日期，翻译没有意义
         if (cls && /embedAuthor|embedFooter|embedProvider/i.test(cls)) return;
+        // Telegram 的界面噪音：时间、播放量、反应、时长角标、转发/签名等
+        // 注意：必须精确到具体类名，不能用裸 reaction/badge/duration，
+        // 否则会把正文根节点上的 has-reactions / has-replies 一起误杀
+        if (
+          el !== root &&
+          cls &&
+          /message-time|message-views|message-replies|message-pinned|message-signature|message-imported|message-price|message-effect-icon|message-reaction|message-action-buttons|ReactionStaticEmoji|quick-reaction|message-select-control|message-media-duration|message-duration/i.test(
+            cls
+          )
+        ) {
+          return;
+        }
         const tag = el.tagName;
+        if ((tag === 'IMG' || tag === 'CANVAS') && isTelegram()) {
+          // Telegram 的表情/贴纸/预览图：alt 里是表情名或文件信息，不适合翻译
+          return;
+        }
         if (tag === 'IMG') {
           const alt = el.getAttribute('alt') || '';
           if (alt && !/^:[^:]+:$/.test(alt)) out += ' ' + alt + ' ';
@@ -341,6 +371,75 @@
     return el || null;
   }
 
+  /* ---------------- Telegram Web 适配 ---------------- */
+
+  function isTelegram() {
+    return SITE === 'telegram-k' || SITE === 'telegram-a';
+  }
+
+  function tgRowSelector() {
+    return SITE === 'telegram-k' ? TG_K_ROW : TG_A_ROW;
+  }
+
+  function tgRows() {
+    if (SITE === 'telegram-k') {
+      return Array.from(document.querySelectorAll(TG_K_ROW));
+    }
+    // A 里 data-message-id 也出现在内部标记元素上，只保留带正文容器的消息根节点
+    return Array.from(document.querySelectorAll(TG_A_ROW)).filter((el) =>
+      el.querySelector('.message-content')
+    );
+  }
+
+  function tgContents(row) {
+    const list =
+      SITE === 'telegram-k'
+        ? row.querySelectorAll('.bubble-content .message, .bubble-content .caption')
+        : row.querySelectorAll('.message-content');
+    return Array.from(list).filter((el) => {
+      // 纯媒体消息（no-text）没有可翻译文字，直接跳过
+      if (el.classList && el.classList.contains('no-text')) return false;
+      return countLetters(extractText(el)) > 0;
+    });
+  }
+
+  function tgScan(force = false) {
+    if (!alive) return;
+    if (!force && !settings.enabled) return;
+    for (const row of tgRows()) {
+      for (const c of tgContents(row)) {
+        // Telegram 会复用/重渲染消息节点：译文被移除但 state 还停在 done，
+        // 会导致这条消息永远不再翻译。这里检测并复位。
+        const wrap = c.querySelector('.' + TRANS_CLS) || c.querySelector('.' + QUOTE_TRANS_CLS);
+        if (!wrap && c.dataset.dxtState === 'done') {
+          delete c.dataset.dxtState;
+          delete c.dataset.dxtFailAt;
+          delete c.dataset.dxtFails;
+        } else if (wrap) {
+          // 消息被编辑（Telegram 有「已编辑」标记）：原文变了就重新翻译
+          const src = sources.get(wrap);
+          const now = extractText(c);
+          if (src !== undefined && now !== src) {
+            wrap.remove();
+            delete c.dataset.dxtState;
+            delete c.dataset.dxtFailAt;
+            delete c.dataset.dxtFails;
+          }
+        }
+        processContentEl(c, force);
+      }
+    }
+  }
+
+  let tgScanTimer = null;
+  function scheduleTgScan() {
+    if (tgScanTimer) return;
+    tgScanTimer = setTimeout(() => {
+      tgScanTimer = null;
+      if (settings.enabled) tgScan();
+    }, 250);
+  }
+
   /* ---------------- 引用消息（回复）翻译 ---------------- */
 
   /** 去掉「回复 @某人」这类 UI 前缀，只保留可翻译的引用内容 */
@@ -479,6 +578,7 @@
     const el = node.nodeType === 1 ? node : node.parentElement;
     if (!el || !el.closest) return false;
     if (el.closest('.' + TRANS_CLS)) return false; // 不翻译自家译文
+    if (isTelegram()) return !!el.closest(tgRowSelector());
     return !!el.closest(MSG_SEL);
   }
 
@@ -811,7 +911,55 @@
     };
   }
 
+  function collectTelegramDiagnostics() {
+    const rows = tgRows();
+    const all = rows.map((row) => ({
+      id: row.getAttribute('data-mid') || row.getAttribute('data-message-id') || '',
+      contents: tgContents(row).map(diagnoseContent),
+    }));
+    const problems = all.filter((r) => r.contents.some((c) => !c.hasTrans && c.state !== 'skip'));
+    const tail = all.slice(-5);
+    const picked = [];
+    const seen = new Set();
+    for (const r of [...problems, ...tail]) {
+      if (seen.has(r.id)) continue;
+      seen.add(r.id);
+      picked.push(r);
+    }
+    const reasonCount = {};
+    for (const r of all) {
+      for (const c of r.contents) {
+        const k = c.hasTrans ? 'translated' : c.reason || c.state || 'unknown';
+        reasonCount[k] = (reasonCount[k] || 0) + 1;
+      }
+    }
+    return {
+      ok: true,
+      site: SITE,
+      version: (() => {
+        try {
+          return chrome.runtime.getManifest().version;
+        } catch {
+          return '';
+        }
+      })(),
+      url: location.href.slice(0, 120),
+      enabled: settings.enabled,
+      provider: settings.provider,
+      target: settings.target,
+      fab: !!document.querySelector('.dxt-fab'),
+      counts: {
+        rows: rows.length,
+        contents: all.reduce((n, r) => n + r.contents.length, 0),
+        translated: document.querySelectorAll('.' + TRANS_CLS).length,
+      },
+      reasons: reasonCount,
+      rows: picked.slice(-30),
+    };
+  }
+
   function collectDiagnostics() {
+    if (isTelegram()) return collectTelegramDiagnostics();
     const all = Array.from(document.querySelectorAll(MSG_SEL)).map((li) => ({
       id: li.id,
       reply: !!li.querySelector(QUOTE_SEL),
@@ -884,6 +1032,10 @@
   function scanAll(force = false) {
     if (!alive) return;
     if (!force && !settings.enabled) return;
+    if (isTelegram()) {
+      tgScan(force);
+      return;
+    }
     // 直接按内容节点扫描：回复消息里被引用的正文与回复正文是两个独立节点
     document.querySelectorAll(CONTENT_SEL).forEach((c) => processContentEl(c, force));
     document.querySelectorAll(QUOTE_SEL).forEach((q) => processQuote(q, force));
@@ -960,6 +1112,7 @@
         if (quote && !quote.querySelector(CONTENT_SEL)) scheduleQuoteStaleCheck(quote);
       }
     }
+    if (isTelegram()) scheduleTgScan();
   });
 
   function scheduleQuoteStaleCheck(quote) {

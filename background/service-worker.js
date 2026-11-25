@@ -58,9 +58,11 @@ const TARGET_MAP = {
 // 串行排队会让并发失效，这里改成「突发 2 个 + 每 160ms 补 1 个」。
 const LIMITER = {
   google: { cap: 2, interval: 160 },
-  tencent: { cap: 2, interval: 160 },
+  // 腾讯对短时间高频请求比较敏感：降低突发、放慢补充，减少被限流/系统繁忙
+  tencent: { cap: 1, interval: 280 },
   bing: { cap: 2, interval: 180 },
-  mymemory: { cap: 1, interval: 600 },
+  // MyMemory 对每分钟请求数很敏感：放慢到 1.5 秒一次，避免批量翻译时自己打出 429
+  mymemory: { cap: 1, interval: 1500 },
 };
 
 const buckets = {};
@@ -119,12 +121,16 @@ async function fetchWithTimeout(url, options = {}, ms = 20000) {
 const health = {};
 const FAIL_SKIP_AFTER = 2; // 连续失败次数达到后熔断
 const COOLDOWN = {
-  network: 180e3, // 网络/接口故障：3 分钟
-  rate: 30e3, // 限流：30 秒
-  quota: 600e3, // 免费额度用尽：10 分钟
+  network: 600e3, // 网络/接口故障：10 分钟（被墙的源不必频繁重试）
+  rate: 120e3, // 限流：2 分钟（429 通常是分钟级窗口）
+  quota: 900e3, // 免费额度用尽：15 分钟
   auth: 600e3, // Key/鉴权问题：10 分钟
   unsupported: 0, // 语种不支持：不熔断
 };
+
+// 探测节流：全部熔断时，每 10 秒给一个源一次「恢复探测」，避免唯一可用源被长期锁死
+const PROBE_INTERVAL_MS = 10000;
+let lastProbeAt = 0;
 
 function classifyError(err) {
   const msg = String((err && err.message) || err || '');
@@ -138,7 +144,9 @@ function classifyError(err) {
 }
 
 function healthOf(provider) {
-  if (!health[provider]) health[provider] = { fails: 0, skipUntil: 0, lastError: '', lastClass: '' };
+  if (!health[provider]) {
+    health[provider] = { fails: 0, skipUntil: 0, lastError: '', lastClass: '', lastFailAt: 0 };
+  }
   return health[provider];
 }
 
@@ -152,6 +160,7 @@ function markProviderFailure(provider, err) {
   h.lastClass = classifyError(err);
   if (h.lastClass === 'unsupported') return; // 只影响这一条消息，不熔断整个源
   h.fails += 1;
+  h.lastFailAt = Date.now();
   if (h.fails >= FAIL_SKIP_AFTER) {
     h.skipUntil = Date.now() + (COOLDOWN[h.lastClass] || COOLDOWN.network);
   }
@@ -167,6 +176,7 @@ function markProviderSuccess(provider) {
 
 function resetHealth() {
   for (const k of Object.keys(health)) delete health[k];
+  lastProbeAt = 0;
 }
 
 /* ------------------------------------------------------------------ */
@@ -276,11 +286,15 @@ async function googleTranslate(text, target) {
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
         const res = await limited('google', () =>
-          fetchWithTimeout(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
-            body: 'q=' + encodeURIComponent(chunk),
-          })
+          fetchWithTimeout(
+            url,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+              body: 'q=' + encodeURIComponent(chunk),
+            },
+            5000
+          )
         );
         if (res.status === 429 || res.status >= 500) {
           const err = new Error('Google HTTP ' + res.status);
@@ -324,9 +338,13 @@ let bingToken = { value: '', exp: 0 };
 async function bingAuth() {
   if (bingToken.value && Date.now() < bingToken.exp) return bingToken.value;
   const res = await limited('bing', () =>
-    fetchWithTimeout('https://edge.microsoft.com/translate/auth', {
-      headers: { Accept: 'text/plain' },
-    })
+    fetchWithTimeout(
+      'https://edge.microsoft.com/translate/auth',
+      {
+        headers: { Accept: 'text/plain' },
+      },
+      5000
+    )
   );
   if (!res.ok) throw new Error('Bing 鉴权失败 HTTP ' + res.status);
   const token = (await res.text()).trim();
@@ -353,11 +371,15 @@ async function bingTranslate(text, target) {
     try {
       const token = await bingAuth();
       const res = await limited('bing', () =>
-        fetchWithTimeout(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-          body: JSON.stringify([{ Text: text }]),
-        })
+        fetchWithTimeout(
+          url,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+            body: JSON.stringify([{ Text: text }]),
+          },
+          5000
+        )
       );
       if (res.status === 401) {
         bingToken.value = '';
@@ -426,22 +448,49 @@ async function tencentTranslate(text, target) {
       source: { lang: 'auto', text_list: [chunk] },
       target: { lang: tl },
     });
-    const res = await limited('tencent', () =>
-      fetchWithTimeout('https://transmart.qq.com/api/imt', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body,
-      })
-    );
-    if (!res.ok) throw new Error('腾讯翻译 HTTP ' + res.status);
-    const data = await res.json();
-    if (!data || !data.header || data.header.ret_code !== 'succ') {
-      throw new Error('腾讯翻译失败：' + ((data && data.message) || '未知错误'));
+    let lastErr = null;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const res = await limited('tencent', () =>
+          fetchWithTimeout(
+            'https://transmart.qq.com/api/imt',
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body,
+            },
+            6000
+          )
+        );
+        if (res.status === 429 || res.status >= 500) {
+          const err = new Error('腾讯翻译 HTTP ' + res.status);
+          err.retryable = true;
+          throw err;
+        }
+        if (!res.ok) throw new Error('腾讯翻译 HTTP ' + res.status);
+        const data = await res.json();
+        if (!data || !data.header || data.header.ret_code !== 'succ') {
+          const msg = (data && data.message) || '未知错误';
+          const err = new Error('腾讯翻译失败：' + msg);
+          // 系统繁忙/请求频繁这类是可恢复的，值得重试一次
+          err.retryable = /繁忙|频繁|稍后|重试|busy|retry|timeout/i.test(msg);
+          throw err;
+        }
+        const t = (data.auto_translation || [])[0];
+        if (typeof t !== 'string' || !t.trim()) throw new Error('腾讯翻译返回为空');
+        parts.push(t);
+        lang = lang || data.src_lang || '';
+        lastErr = null;
+        break;
+      } catch (e) {
+        lastErr = e;
+        // 超时通常是网络/出口问题，立刻换下一个源比再等一次更划算
+        if (e && e.name === 'AbortError') throw e;
+        if (!e.retryable || attempt === 1) break;
+        await sleep(700);
+      }
     }
-    const t = (data.auto_translation || [])[0];
-    if (typeof t !== 'string' || !t.trim()) throw new Error('腾讯翻译返回为空');
-    parts.push(t);
-    lang = lang || data.src_lang || '';
+    if (lastErr) throw lastErr;
   }
   return { text: parts.join('\n'), lang };
 }
@@ -456,7 +505,9 @@ async function myMemoryTranslate(text, target) {
   const langpair = `${src}|${target}`;
   const res = await limited('mymemory', () =>
     fetchWithTimeout(
-      'https://api.mymemory.translated.net/get?q=' + q + '&langpair=' + encodeURIComponent(langpair)
+      'https://api.mymemory.translated.net/get?q=' + q + '&langpair=' + encodeURIComponent(langpair),
+      {},
+      8000
     )
   );
   if (!res.ok) throw new Error('MyMemory HTTP ' + res.status);
@@ -718,13 +769,34 @@ async function translateText(text, target, provider, settings) {
 
   let list = all;
   if (provider === 'auto') {
-    const usable = all.filter(providerHealthy);
-    if (usable.length) {
-      list = usable;
-    } else {
-      // 全部源都在熔断冷却中：按冷却结束时间排序，最多再试 2 个，
-      // 既能尽快恢复，又不会在真断网时一次烧掉 4 个请求。
-      list = [...all].sort((a, b) => healthOf(a).skipUntil - healthOf(b).skipUntil).slice(0, 2);
+    const healthy = all.filter(providerHealthy);
+    const unhealthy = all.filter((p) => !providerHealthy(p));
+    const probeDue = Date.now() - lastProbeAt > PROBE_INTERVAL_MS;
+    list = healthy.slice();
+
+    if (unhealthy.length) {
+      // 按冷却结束时间排序，最早恢复的优先探测；
+      // 时间相同时（同一毫秒被熔断）用失败次数兜底，避免探测总停在同一个源上
+      unhealthy.sort(
+        (a, b) =>
+          healthOf(a).skipUntil - healthOf(b).skipUntil || healthOf(a).fails - healthOf(b).fails
+      );
+      if (!list.length) {
+        // 全部熔断：每次只探测一个（轮流），既给恢复机会，又不至于每条消息全量重试
+        list = [unhealthy[0]];
+        lastProbeAt = Date.now();
+      } else if (list.length <= 1) {
+        // 只剩 0~1 个「看起来健康」的源时，额外带上一个熔断源一起试，
+        // 否则唯一能用的源一旦被熔断，翻译就会长时间卡住
+        list.push(unhealthy[0]);
+        lastProbeAt = Date.now();
+      } else if (probeDue) {
+        // 还有多个健康源时，每 10 秒额外探测一个熔断源
+        list.push(unhealthy[0]);
+        lastProbeAt = Date.now();
+      }
+    } else if (!list.length) {
+      list = all.slice();
     }
   }
   const errors = [];
@@ -749,7 +821,9 @@ async function translateText(text, target, provider, settings) {
   const hint =
     provider === 'auto' && !providerSupports('tencent', target)
       ? '（该语种免费源有限，建议在设置中启用大模型翻译）'
-      : '';
+      : provider === 'auto'
+        ? '（当前免费源均不可用：可在设置中填写 DeepSeek 等大模型 Key，或在设置里切换翻译源）'
+        : '';
   throw new Error((errors.join('；') || '翻译失败') + hint);
 }
 
@@ -804,7 +878,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true; // 异步响应
   }
   if (msg.type === 'ping') {
-    sendResponse({ ok: true, version: '1.4.6' });
+    sendResponse({ ok: true, version: '1.4.7' });
     return;
   }
   if (msg.type === 'reset-health') {

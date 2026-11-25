@@ -1,12 +1,12 @@
-# Discord 外语翻译器
+# Discord / Telegram 外语翻译器
 
-自动识别 Discord 网页版里的外语消息，并在消息下方追加译文。面向中文用户设计，默认翻译成简体中文，也可切换目标语言。
+自动识别 **Discord** 与 **Telegram 网页版**里的外语消息，并在消息下方追加译文。面向中文用户设计，默认翻译成简体中文，也可切换目标语言。
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.4.6-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.4.7-blue.svg)](CHANGELOG.md)
 [![Manifest V3](https://img.shields.io/badge/Manifest-V3-5865F2.svg)](manifest.json)
 
-> 支持 Chrome / Edge 等 Chromium 内核浏览器（Manifest V3），不适用于 Discord 桌面客户端。
+> 支持 Chrome / Edge 等 Chromium 内核浏览器（Manifest V3）。支持 Discord 网页版、Telegram Web K（`web.telegram.org/k`）与 Web A（`web.telegram.org/a`），不适用于桌面客户端。
 
 ![效果演示](docs/mock-demo.png)
 
@@ -14,10 +14,12 @@
 
 ## 功能
 
+- **双站点支持**：Discord 网页版 + Telegram Web（K / A 两套界面）
 - **自动翻译**：新消息出现即翻译，译文显示在原文下方；中文、纯 emoji、纯链接会自动跳过
 - **划词翻译**：用鼠标选中消息里的任意文字，点选区旁的「译」按钮即可翻译，支持复制；也可设为「选中即翻译」
-- **引用消息翻译**：回复消息里被引用的内容会单独翻译，显示在引用行下方
-- **已编辑消息**：带「(已编辑)」标记的消息照常翻译，标记和时间戳不会混进译文
+- **引用消息翻译**（Discord）：回复消息里被引用的内容会单独翻译，显示在引用行下方
+- **已编辑消息**（Discord）：带「(已编辑)」标记的消息照常翻译，标记和时间戳不会混进译文
+- **链接卡片翻译**（Discord）：链接预览 / 机器人卡片里的标题与描述会翻译，显示在卡片下方
 - **多种翻译源**：Google、腾讯翻译君、Bing、MyMemory、DeepL、有道智云、LibreTranslate、大模型
 - **自动切换**：某个源失败、限流或语种不支持时自动换下一个；已配置的 DeepL / 有道 / LibreTranslate / 大模型会自动加入切换队列
 - **原文保留**：译文以「译」块追加，不覆盖原文；点击「译」可收起/展开
@@ -31,6 +33,8 @@
 | 划词翻译 | 设置页 |
 | --- | --- |
 | ![划词翻译](docs/select-demo.png) | ![设置页](docs/options.png) |
+
+![Telegram 网页版效果](docs/telegram-demo.png)
 
 ![真实 Discord 页面效果](docs/real-discord.png)
 
@@ -115,7 +119,9 @@ git clone https://github.com/<your-name>/discord-web-translator.git
 - **翻译结果与原文相同**：如拼写错误（`goos`）或专有名词，接口原样返回时不会显示译文
 - **Discord 改版**：选择器基于稳定的 `id` 前缀（`chat-messages-*`、`message-content-*`、`message-reply-context-*`），若官方大改 DOM，可能需要更新 `content/content.js` 顶部常量
 - **虚拟列表**：消息滚出屏幕会被回收，重新滚回时从缓存恢复译文，几乎无感
-- **仅网页版**：不适用于 Discord 桌面客户端（Electron 版）
+- **仅网页版**：不适用于 Discord / Telegram 桌面客户端
+- **Telegram 暂不支持引用与卡片**：目前只翻译消息正文和媒体说明文字；Discord 专属的引用正文、链接卡片翻译尚未适配 Telegram
+- **Telegram 虚拟列表**：消息滚出屏幕会被回收，重新滚回时从缓存恢复译文
 
 ---
 
@@ -135,6 +141,7 @@ npm run test:e2e
 - `test/background.test.cjs`：翻译源解析、回退、熔断、缓存等（mock fetch）
 - `test/e2e-extension.mjs`：无头 Edge 加载扩展，验证 Service Worker、设置页、discord.com 注入、引用/已编辑消息与划词翻译
 - `test/mock-discord.html`：模拟 Discord DOM 的交互测试页（自带 chrome API 桩，直接用浏览器打开）
+- `test/mock-telegram-k.html` / `test/mock-telegram-a.html`：模拟 Telegram Web K / A 的消息结构
 
 > `e2e-extension.mjs` 在受限容器/沙箱中可能无法启动 Chromium，需要在普通桌面环境运行。
 
@@ -174,6 +181,20 @@ Discord 的 `className` 是构建哈希（如 `messageContent_2i8Bfm`），不�
 
 ---
 
+## 发布到 GitHub
+
+```bash
+git init
+git add .
+git commit -m "feat: Discord 外语翻译器 v1.4.5"
+git branch -M main
+git remote add origin https://github.com/<your-name>/discord-web-translator.git
+git push -u origin main
+```
+
+打 Release 时，把仓库根目录打包为 `discord-translator-1.4.7.zip`（包含 `manifest.json` 及其引用文件即可）上传到 Releases。CI 会在 push/PR 时自动运行 `npm test`。
+
+---
 
 ## 贡献
 

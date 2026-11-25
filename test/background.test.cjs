@@ -347,18 +347,20 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
       if (String(url).includes('translate.googleapis.com')) throw new Error('blocked');
       return origFetch(url, options);
     };
-    const r = await T.handleTranslate({
-      type: 'translate',
-      text: 'recover from all down',
-      provider: 'auto',
-      target: 'zh-CN',
-    });
+    let r = null;
+    for (let i = 0; i < 4 && !(r && r.ok); i++) {
+      r = await T.handleTranslate({
+        type: 'translate',
+        text: 'recover from all down ' + i,
+        provider: 'auto',
+        target: 'zh-CN',
+      });
+    }
     globalThis.fetch = origFetch;
-    assert.strictEqual(r.ok, true);
-    assert.strictEqual(r.provider, 'tencent', '应能从全部熔断中恢复到可用源');
+    assert.ok(r && r.ok, '应能从全部熔断中恢复');
+    assert.strictEqual(r.provider, 'tencent', '应恢复到可用源');
     ok('全部熔断后自动恢复');
   }
-
   /* 16. 语种能力：腾讯不支持俄语，显式选择时应给出明确提示 */
   {
     assert.strictEqual(T.providerSupports('tencent', 'ru'), false);
@@ -454,6 +456,58 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     assert.strictEqual(r.text, '谢谢你');
     assert.strictEqual(r.provider, 'tencent');
     ok('原样返回时继续尝试下一个源');
+  }
+
+  /* 19. 全部熔断时轮换探测：不会只试固定的两个源 */
+  {
+    T.resetHealth();
+    for (const p of ['google', 'tencent', 'bing', 'mymemory']) {
+      T.markProviderFailure(p, new Error('Failed to fetch'));
+      T.markProviderFailure(p, new Error('Failed to fetch'));
+    }
+    const origFetch = globalThis.fetch;
+    globalThis.fetch = async (url, options = {}) => {
+      const u = String(url);
+      if (u.includes('translate.googleapis.com')) throw new Error('Failed to fetch');
+      if (u.includes('transmart.qq.com')) {
+        return json({ header: { ret_code: 'succ' }, auto_translation: ['探测成功'], src_lang: 'en' });
+      }
+      throw new Error('offline');
+    };
+    // 第一次探测最早的 google，必然失败
+    let firstErr = null;
+    try {
+      await T.translateText('probe one', 'zh-CN', 'auto', {});
+    } catch (e) {
+      firstErr = e;
+    }
+    // 第二次应该轮到 tencent 并成功
+    const r = await T.translateText('probe two', 'zh-CN', 'auto', {});
+    globalThis.fetch = origFetch;
+    assert.ok(firstErr, '第一次探测应失败');
+    assert.strictEqual(r.provider, 'tencent');
+    assert.strictEqual(r.text, '探测成功');
+    ok('全部熔断后轮换探测');
+  }
+
+  /* 20. 腾讯「系统繁忙」自动重试一次 */
+  {
+    T.resetHealth();
+    const origFetch = globalThis.fetch;
+    let n = 0;
+    globalThis.fetch = async (url) => {
+      if (String(url).includes('transmart.qq.com')) {
+        n++;
+        if (n === 1) return json({ header: { ret_code: 'error' }, message: '系统繁忙，请稍后重试' });
+        return json({ header: { ret_code: 'succ' }, auto_translation: ['重试成功'], src_lang: 'en' });
+      }
+      throw new Error('unexpected');
+    };
+    const r = await T.tencentTranslate('busy test', 'zh-CN');
+    globalThis.fetch = origFetch;
+    assert.strictEqual(n, 2);
+    assert.strictEqual(r.text, '重试成功');
+    ok('腾讯系统繁忙自动重试');
   }
 
   console.log(`\n全部通过：${passed} 项`);

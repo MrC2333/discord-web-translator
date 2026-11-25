@@ -1,13 +1,14 @@
 {
   "manifest_version": 3,
-  "name": "Discord 外语翻译器",
+  "name": "Discord / Telegram 外语翻译器",
   "short_name": "DXT",
-  "version": "1.4.6",
-  "description": "自动把 Discord 网页版里的外语消息翻译成你的语言，支持 Google、Bing、MyMemory 与自定义大模型。",
+  "version": "1.4.7",
+  "description": "自动翻译 Discord 与 Telegram 网页版里的外语消息，支持 Google、腾讯、Bing、DeepL、有道、大模型等多种翻译源。",
   "minimum_chrome_version": "116",
   "permissions": ["storage"],
   "host_permissions": [
     "https://*.discord.com/*",
+    "https://web.telegram.org/*",
     "https://translate.googleapis.com/*",
     "https://transmart.qq.com/*",
     "https://edge.microsoft.com/*",
@@ -22,7 +23,7 @@
   "optional_host_permissions": ["https://*/*", "http://localhost/*", "http://127.0.0.1/*"],
   "content_scripts": [
     {
-      "matches": ["https://*.discord.com/*"],
+      "matches": ["https://*.discord.com/*", "https://web.telegram.org/*"],
       "js": ["content/content.js"],
       "css": ["content/content.css"],
       "run_at": "document_idle"
@@ -33,7 +34,7 @@
   },
   "action": {
     "default_popup": "popup/popup.html",
-    "default_title": "Discord 翻译器"
+    "default_title": "Discord / Telegram 翻译器"
   },
   "options_page": "options/options.html",
   "icons": {

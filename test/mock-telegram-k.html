@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="dxt-site" content="telegram-k" />
+  <title>Mock Telegram K</title>
+  <link rel="stylesheet" href="../content/content.css" />
+  <style>
+    :root { color-scheme: dark; }
+    body { margin: 0; background: #0e1621; color: #fff; font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif; }
+    .bubbles { max-width: 720px; margin: 20px auto; padding: 10px; }
+    .bubble { margin: 8px 0; display: flex; }
+    .bubble.is-out { justify-content: flex-end; }
+    .bubble-content {
+      background: #182533; border-radius: 10px; padding: 6px 10px;
+      max-width: 75%; font-size: 15px; line-height: 1.4;
+    }
+    .bubble.is-out .bubble-content { background: #2b5278; }
+    .message { white-space: pre-wrap; word-break: break-word; }
+    .caption { font-size: 14px; color: #d5dbe3; }
+    .is-date { justify-content: center; color: #7d8b99; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <div class="bubbles">
+    <div class="bubble is-date" data-mid="date-1">今天</div>
+    <div class="bubble" data-mid="1001"><div class="bubble-content"><div class="message">Hello everyone, are you ready for the update?</div></div></div>
+    <div class="bubble is-out" data-mid="1002"><div class="bubble-content"><div class="message">こんにちは！今日はいい天気ですね。</div></div></div>
+    <div class="bubble" data-mid="1003"><div class="bubble-content"><div class="message">Привет! Как дела?</div></div></div>
+    <div class="bubble" data-mid="1004"><div class="bubble-content"><div class="message">这条是中文，不应该被翻译。</div></div></div>
+    <div class="bubble" data-mid="1005"><div class="bubble-content"><div class="caption">Photo caption: the new map looks great</div></div></div>
+
+    <div class="bubble" data-mid="1006"><div class="bubble-content">
+      <div class="message">Keep in mind this guy is a scam</div>
+      <span class="time">15:20</span>
+      <span class="message-time">15:20</span>
+      <span class="message-views">3.9K</span>
+    </div></div>
+  </div>
+
+  <script src="harness.js"></script>
+  <script src="../content/content.js"></script>
+</body>
+</html>

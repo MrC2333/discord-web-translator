@@ -28,7 +28,7 @@ function fillSelect(sel, items, value, useValue) {
 async function activeDiscordTab() {
   const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
   const tab = tabs[0];
-  if (!tab || !tab.url || !/^https:\/\/([\w-]+\.)?discord\.com\//.test(tab.url)) return null;
+  if (!tab || !tab.url || !/^https:\/\/(([\w-]+\.)?discord\.com|web\.telegram\.org)\//.test(tab.url)) return null;
   return tab;
 }
 
@@ -62,7 +62,7 @@ async function init() {
 
   const tab = await activeDiscordTab();
   if (!tab) {
-    setStatus('请先打开 Discord 网页版（discord.com）再使用。');
+    setStatus('请先打开 Discord 或 Telegram 网页版再使用。');
     $('translateAll').disabled = true;
     $('diagnose').disabled = true;
     return;
@@ -70,7 +70,7 @@ async function init() {
 
   const providerLabel =
     (window.DXT_PROVIDERS.find((p) => p.value === settings.provider) || {}).label || settings.provider;
-  setStatus('已连接到 Discord 标签页 · 翻译源：' + providerLabel);
+  setStatus('已连接到聊天页面 · 翻译源：' + providerLabel);
 
   $('translateAll').addEventListener('click', async () => {
     $('translateAll').disabled = true;

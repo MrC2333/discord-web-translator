@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="dxt-site" content="telegram-a" />
+  <title>Mock Telegram A</title>
+  <link rel="stylesheet" href="../content/content.css" />
+  <style>
+    :root { color-scheme: dark; }
+    body { margin: 0; background: #212121; color: #fff; font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif; }
+    .messages { max-width: 720px; margin: 20px auto; padding: 10px; }
+    .message { margin: 8px 0; }
+    .message-content-wrapper { display: inline-block; max-width: 75%; }
+    .message-content {
+      background: #2b2b2b; border-radius: 10px; padding: 6px 10px;
+      font-size: 15px; line-height: 1.4; white-space: pre-wrap; word-break: break-word;
+    }
+    .message.is-out { text-align: right; }
+    .message.is-out .message-content { background: #766ac8; text-align: left; }
+  </style>
+</head>
+<body>
+  <div class="messages">
+    <div class="message" id="message-2001" data-message-id="2001">
+      <div class="message-content-wrapper"><div class="message-content text">Hello everyone, are you ready for the update?</div></div>
+    </div>
+    <div class="message is-out" id="message-2002" data-message-id="2002">
+      <div class="message-content-wrapper"><div class="message-content text">こんにちは！今日はいい天気ですね。</div></div>
+    </div>
+    <div class="message" id="message-2003" data-message-id="2003">
+      <div class="message-content-wrapper"><div class="message-content text">Привет! Как дела?</div></div>
+    </div>
+    <div class="message" id="message-2004" data-message-id="2004">
+      <div class="message-content-wrapper"><div class="message-content text">这条是中文，不应该被翻译。</div></div>
+    </div>
+    <div class="message" id="message-2005" data-message-id="2005">
+      <div class="message-content-wrapper"><div class="message-content text">Photo caption: the new map looks great</div></div>
+    </div>
+
+    <!-- 带 UI 噪音的消息：时长、播放量、反应、时间 -->
+    <div class="message" id="message-2006" data-message-id="2006">
+      <div class="message-content-wrapper">
+        <div class="message-content peer-color-6 text has-action-button media" >
+          <span>Keep in mind this guy is a scam</span>
+          <span class="message-time" title="2026-11-25">15:20</span>
+          <span class="message-views" title="views">3.9K</span>
+          <span class="message-duration">0:08</span>
+          <div class="message-reaction"><span class="ReactionStaticEmoji">🔥</span><span>169</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 纯 GIF 消息（no-text）：不应翻译 -->
+    <div class="message" id="message-2007" data-message-id="2007">
+      <div class="message-content-wrapper">
+        <div class="message-content peer-color-6 no-text has-action-button media">
+          <img class="thumbnail" alt="GIF" src="data:image/gif;base64,R0lGODlhAQABAAAAACw=">
+          <span class="message-duration">04:12</span>
+        </div>
+      </div>
+    </div>
+    <!-- 带反应的正文：根节点有 has-reactions，不能被误判成噪音 -->
+    <div class="message" id="message-2008" data-message-id="2008">
+      <div class="message-content-wrapper">
+        <div class="message-content peer-color-6 text has-action-button has-reactions">This message has reactions and must still be translated.</div>
+      </div>
+    </div>
+  </div>
+
+  <script src="harness.js"></script>
+  <script src="../content/content.js"></script>
+</body>
+</html>
