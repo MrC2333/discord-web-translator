@@ -1,5 +1,7 @@
 # Discord / Telegram 外语翻译器
 
+**简体中文** | [English](README.en.md)
+
 自动识别 **Discord** 与 **Telegram 网页版**里的外语消息，并在消息下方追加译文。面向中文用户设计，默认翻译成简体中文，也可切换目标语言。
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
