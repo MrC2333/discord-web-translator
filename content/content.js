@@ -266,7 +266,7 @@
     }
   }
 
-  function requestViaBackground(text, target) {
+  function requestViaBackground(text, target, providerOverride) {
     return new Promise((resolve) => {
       let done = false;
       const finish = (v) => {
@@ -277,7 +277,12 @@
       const timer = setTimeout(() => finish({ ok: false, error: '翻译超时' }), REQUEST_TIMEOUT_MS);
       try {
         chrome.runtime.sendMessage(
-          { type: 'translate', text, provider: settings.provider, target: target || settings.target },
+          {
+            type: 'translate',
+            text,
+            provider: providerOverride || settings.provider,
+            target: target || settings.target,
+          },
           (res) => {
             clearTimeout(timer);
             if (chrome.runtime.lastError) {
@@ -306,8 +311,8 @@
     return typeof Translator !== 'undefined';
   }
 
-  function builtinTargetLang() {
-    const t = String(settings.target || 'zh-CN');
+  function builtinTargetLang(override) {
+    const t = String(override || settings.target || 'zh-CN');
     if (t === 'zh-TW' || t === 'zh-Hant') return 'zh-Hant';
     return t.split('-')[0];
   }
@@ -383,9 +388,9 @@
     return parts;
   }
 
-  async function builtinTranslate(text) {
+  async function builtinTranslate(text, targetOverride) {
     if (!builtinSupported()) throw new Error('当前浏览器不支持内置翻译（需要 Chrome/Edge 138+）');
-    const tgt = builtinTargetLang();
+    const tgt = builtinTargetLang(targetOverride);
     const src = await detectLangForBuiltin(text);
     if (src === tgt) return { ok: true, text, lang: src, provider: 'builtin' };
     lastBuiltinPair = { src, tgt };
@@ -431,6 +436,14 @@
       btn.textContent = '下载中…';
       try {
         await downloadBuiltinPack(pair);
+        // 同时把反向语言包也下好（如 en→zh 与 zh→en），发送前翻译才能离线用
+        if (pair.src !== pair.tgt) {
+          try {
+            await downloadBuiltinPack({ src: pair.tgt, tgt: pair.src });
+          } catch {
+            /* 反向包失败不影响阅读 */
+          }
+        }
         box.remove();
         toast('内置翻译已就绪，正在重新翻译…');
         // 清掉失败缓存与退避，让消息立刻用内置翻译重试
@@ -455,24 +468,26 @@
 
   async function translateAnywhere(text, target) {
     const tgtOverride = target && target !== settings.target ? target : '';
-    if (settings.provider === 'builtin' && !tgtOverride) {
+    if (settings.provider === 'builtin') {
       try {
-        return await builtinTranslate(text);
+        return await builtinTranslate(text, tgtOverride || undefined);
       } catch (e) {
         if (e && e.needsDownload) showBuiltinPrompt(e.pair);
+        // 发送前翻译（目标语言不同）允许回退到网络源，保证消息能翻出去
+        if (tgtOverride) return requestViaBackground(text, tgtOverride, 'auto');
         return { ok: false, error: (e && e.message) || String(e) };
       }
     }
-    if (settings.provider === 'auto' && builtinSupported() && !tgtOverride) {
+    if (settings.provider === 'auto' && builtinSupported()) {
       // 内置翻译可用时优先：完全离线、无额度限制
-      const tgt = builtinTargetLang();
+      const tgt = builtinTargetLang(tgtOverride || undefined);
       const src = guessLangByScript(text);
       lastBuiltinPair = { src, tgt };
       if (src !== tgt) {
         try {
           const state = await builtinAvailability(src, tgt);
           if (state === 'available') {
-            const r = await builtinTranslate(text);
+            const r = await builtinTranslate(text, tgtOverride || undefined);
             if (r && r.ok && r.text) return r;
           }
         } catch {
@@ -1417,6 +1432,24 @@
   ]);
   const OUTGOING_PREFIX_RE = /^\s*([a-z]{2}(?:-[a-z]{2})?)\s*[:：]\s*/i;
   let outgoingBusy = false;
+  let outgoingComposing = false;
+  // 输入法组词期间（中文/日文等）回车是在选词，不是发送
+  window.addEventListener(
+    'compositionstart',
+    () => {
+      outgoingComposing = true;
+    },
+    true
+  );
+  window.addEventListener(
+    'compositionend',
+    () => {
+      setTimeout(() => {
+        outgoingComposing = false;
+      }, 80);
+    },
+    true
+  );
 
   function composerFromTarget(t) {
     if (!t || t.nodeType !== 1 || !t.closest) return null;
@@ -1456,7 +1489,9 @@
       range.selectNodeContents(composer);
       sel.removeAllRanges();
       sel.addRange(range);
-      if (document.execCommand('insertText', false, text)) return true;
+      if (document.execCommand('insertText', false, text)) {
+        if (sameTextClient((composer.innerText || '').replace(/\u200b/g, ''), text)) return true;
+      }
     } catch {
       /* 退回直接赋值 */
     }
@@ -1465,7 +1500,7 @@
       composer.dispatchEvent(
         new InputEvent('input', { bubbles: true, inputType: 'insertText', data: text })
       );
-      return true;
+      return sameTextClient((composer.innerText || '').replace(/\u200b/g, ''), text);
     } catch {
       return false;
     }
@@ -1497,6 +1532,7 @@
 
   async function handleOutgoingEnter(e) {
     if (e.key !== 'Enter' || e.shiftKey || e.isComposing || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (outgoingComposing || e.keyCode === 229) return; // 输入法选词中，交给输入法处理
     if (outgoingBusy) return; // 自己派发的 Enter，放行
     if (!settings.enabled || !settings.outgoingEnabled) return;
     const composer = composerFromTarget(e.target);
@@ -1535,7 +1571,9 @@
       let out = res && res.ok ? String(res.text || '') : '';
       if (!out || sameTextClient(out, body)) out = body;
       if (settings.outgoingKeepOriginal && out !== body) out = out + '\n' + body;
-      setComposerText(composer, out);
+      if (!setComposerText(composer, out)) {
+        toast('发送前翻译：无法写入译文，已按原文发送');
+      }
     } finally {
       sendComposer(composer);
     }

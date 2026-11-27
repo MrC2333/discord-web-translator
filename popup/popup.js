@@ -5,6 +5,8 @@ const DEFAULTS = {
   enabled: true,
   target: 'zh-CN',
   provider: 'auto',
+  outgoingEnabled: false,
+  outgoingTarget: 'en',
 };
 
 const $ = (id) => document.getElementById(id);
@@ -43,7 +45,9 @@ async function init() {
 
   fillSelect($('target'), window.DXT_LANGS, settings.target, false);
   fillSelect($('provider'), window.DXT_PROVIDERS, settings.provider, true);
+  fillSelect($('outgoingTarget'), window.DXT_LANGS, settings.outgoingTarget || 'en', false);
   $('enabled').checked = settings.enabled !== false;
+  $('outgoingEnabled').checked = settings.outgoingEnabled === true;
 
   $('enabled').addEventListener('change', (e) => {
     chrome.storage.sync.set({ enabled: e.target.checked });
@@ -53,6 +57,12 @@ async function init() {
   });
   $('provider').addEventListener('change', (e) => {
     chrome.storage.sync.set({ provider: e.target.value });
+  });
+  $('outgoingEnabled').addEventListener('change', (e) => {
+    chrome.storage.sync.set({ outgoingEnabled: e.target.checked });
+  });
+  $('outgoingTarget').addEventListener('change', (e) => {
+    chrome.storage.sync.set({ outgoingTarget: e.target.value });
   });
 
   $('openOptions').addEventListener('click', (e) => {
