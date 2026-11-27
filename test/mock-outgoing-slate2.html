@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>Mock Outgoing Slate2 - 异步选区同步</title>
+  <style>
+    body { background: #313338; color: #dbdee1; font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif; padding: 24px; }
+    #composer { min-height: 44px; padding: 10px; background: #383a40; border-radius: 8px; max-width: 520px; outline: none; }
+    #messages { margin-top: 16px; white-space: pre-wrap; color: #8ee08e; max-width: 520px; }
+  </style>
+</head>
+<body>
+  <div id="composer" contenteditable="true"></div>
+  <div id="messages"></div>
+
+  <script>
+    // 模拟 Slate：内部选区只在 selectionchange（异步）时同步；
+    // 粘贴时按内部选区替换，没有全选就追加到末尾。
+    const c = document.getElementById('composer');
+    const m = document.getElementById('messages');
+    let state = '';
+    let selAll = false;
+
+    document.addEventListener('selectionchange', () => {
+      const sel = window.getSelection();
+      if (!sel || !sel.rangeCount) return;
+      const r = sel.getRangeAt(0);
+      const txt = c.innerText.trim();
+      selAll = !!txt && r.toString().trim() === txt && c.contains(r.startContainer);
+    });
+
+    c.addEventListener('input', () => {
+      state = c.innerText;
+      selAll = false;
+    });
+
+    c.addEventListener('paste', (e) => {
+      e.preventDefault();
+      const t = (e.clipboardData && e.clipboardData.getData('text/plain')) || '';
+      if (selAll) {
+        state = t;
+        c.textContent = t;
+      } else {
+        state = (state || '') + t;
+        c.textContent = state;
+      }
+      selAll = false;
+    });
+
+    c.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        const t = (state || '').trim();
+        if (t) m.textContent += '[' + t + ']\n';
+        state = '';
+        c.textContent = '';
+      }
+    });
+  </script>
+  <script src="harness.js"></script>
+  <script>
+    const __origGet = chrome.storage.sync.get;
+    chrome.storage.sync.get = async (defaults) => ({
+      ...(await __origGet(defaults)),
+      outgoingEnabled: true,
+      outgoingTarget: 'en',
+      target: 'zh-CN',
+    });
+  </script>
+  <script src="../content/content.js"></script>
+</body>
+</html>

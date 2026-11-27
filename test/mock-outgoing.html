@@ -17,6 +17,10 @@
     // 模拟聊天框：回车把内容「发送」出去
     const c = document.getElementById('composer');
     const m = document.getElementById('messages');
+    c.addEventListener('paste', (e) => {
+      e.preventDefault();
+      c.textContent = (e.clipboardData && e.clipboardData.getData('text/plain')) || '';
+    });
     c.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();

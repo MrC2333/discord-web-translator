@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>Mock Outgoing Async - 异步状态</title>
+  <style>
+    body { background: #313338; color: #dbdee1; font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif; padding: 24px; }
+    #composer { min-height: 44px; padding: 10px; background: #383a40; border-radius: 8px; max-width: 520px; outline: none; }
+    #messages { margin-top: 16px; white-space: pre-wrap; color: #8ee08e; max-width: 520px; }
+  </style>
+</head>
+<body>
+  <div id="composer" contenteditable="true"></div>
+  <div id="messages"></div>
+
+  <script>
+    // 模拟 Slate/React：DOM 立即更新，但「内部状态」延迟 120ms 才提交。
+    // 如果扩展在状态提交前派发 Enter，这里就会把旧内容发出去。
+    const c = document.getElementById('composer');
+    const m = document.getElementById('messages');
+    let state = '';
+    let timer = null;
+    c.addEventListener('input', () => {
+      const v = c.innerText.trim();
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        state = v;
+      }, 120);
+    });
+    window.__log = [];
+    c.addEventListener('paste', (e) => {
+      e.preventDefault();
+      const t = (e.clipboardData && e.clipboardData.getData('text/plain')) || '';
+      c.textContent = t;
+      clearTimeout(timer);
+      timer = setTimeout(() => { state = t; }, 120);
+    });
+    c.addEventListener('keydown', (e) => {
+      window.__log.push({ ev: 'keydown', key: e.key, trusted: e.isTrusted, state, dp: e.defaultPrevented });
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        const t = (state || '').trim();
+        window.__log.push({ ev: 'send', state: t });
+        if (t) m.textContent += '[' + t + ']\n';
+        state = '';
+        c.textContent = '';
+      }
+    });
+  </script>
+  <script src="harness.js"></script>
+  <script>
+    const __origGet = chrome.storage.sync.get;
+    chrome.storage.sync.get = async (defaults) => ({
+      ...(await __origGet(defaults)),
+      outgoingEnabled: true,
+      outgoingTarget: 'en',
+      target: 'zh-CN',
+    });
+  </script>
+  <script src="../content/content.js"></script>
+</body>
+</html>

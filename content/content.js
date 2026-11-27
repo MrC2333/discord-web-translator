@@ -1481,53 +1481,94 @@
     return n(a) === n(b);
   }
 
-  function setComposerText(composer, text) {
-    try {
-      composer.focus();
-      const sel = window.getSelection();
-      const range = document.createRange();
-      range.selectNodeContents(composer);
-      sel.removeAllRanges();
-      sel.addRange(range);
-      if (document.execCommand('insertText', false, text)) {
-        if (sameTextClient((composer.innerText || '').replace(/\u200b/g, ''), text)) return true;
-      }
-    } catch {
-      /* 退回直接赋值 */
-    }
-    try {
-      composer.textContent = text;
-      composer.dispatchEvent(
-        new InputEvent('input', { bubbles: true, inputType: 'insertText', data: text })
-      );
-      return sameTextClient((composer.innerText || '').replace(/\u200b/g, ''), text);
-    } catch {
-      return false;
-    }
-  }
+  async function setComposerText(composer, text) {
+    const current = () => (composer.innerText || '').replace(/\u200b/g, '').trim();
+    if (sameTextClient(current(), text)) return true;
 
-  function sendComposer(composer) {
-    // 先置忙，确保接下来这次合成的 Enter 不会被自己再拦截一次
-    outgoingBusy = true;
-    setTimeout(() => {
+    const selectAll = () => {
+      composer.focus();
       try {
-        composer.dispatchEvent(
-          new KeyboardEvent('keydown', {
-            key: 'Enter',
-            code: 'Enter',
-            keyCode: 13,
-            which: 13,
-            bubbles: true,
-            cancelable: true,
-          })
-        );
+        document.execCommand('selectAll');
       } catch {
         /* ignore */
       }
-      setTimeout(() => {
-        outgoingBusy = false;
-      }, 300);
-    }, 30);
+      const sel = window.getSelection();
+      if (!sel || sel.rangeCount === 0 || !composer.contains(sel.anchorNode)) {
+        const range = document.createRange();
+        range.selectNodeContents(composer);
+        sel.removeAllRanges();
+        sel.addRange(range);
+      }
+      try {
+        document.dispatchEvent(new Event('selectionchange'));
+      } catch {
+        /* ignore */
+      }
+    };
+
+    // 只走「模拟粘贴」：这是唯一能让 Slate 真正更新内部模型的方式。
+    // execCommand 只会改 DOM，模型不同步会导致之后发送/编辑错乱甚至崩溃。
+    for (let attempt = 0; attempt < 2; attempt++) {
+      selectAll();
+      await sleep(150); // 等 selectionchange 传播，Slate 才会把选区同步成全选
+      try {
+        const dt = new DataTransfer();
+        dt.setData('text/plain', text);
+        composer.dispatchEvent(
+          new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: dt })
+        );
+      } catch {
+        /* 换一次重试 */
+      }
+      await sleep(100);
+      if (sameTextClient(current(), text)) return true;
+    }
+    return false;
+  }
+
+  async function sendComposer(composer, expected) {
+    // 先置忙，确保接下来这次合成的 Enter 不会被自己再拦截一次
+    outgoingBusy = true;
+    // 关键：等编辑器把译文真正写进 DOM / 内部状态，再派发 Enter。
+    // 否则 Slate/React 可能拿旧状态把原文发出去（表现为「看到翻译了，发出去还是原文」）。
+    const deadline = Date.now() + 1500;
+    let el = composer;
+    let retried = false;
+    let tries = 0;
+    while (expected && Date.now() < deadline) {
+      const active = document.activeElement;
+      if (active && active.getAttribute && active.getAttribute('contenteditable') === 'true') {
+        el = active; // React 可能重建过编辑器节点，用当前聚焦的那个
+      }
+      const now = (el.innerText || '').replace(/\u200b/g, '').trim();
+      if (sameTextClient(now, expected)) break;
+      tries++;
+      if (!retried && tries >= 6) {
+        // 迟迟没写进去：再写一次，避免节点被替换后内容丢失
+        retried = true;
+        await setComposerText(el, expected);
+      }
+      await sleep(40);
+    }
+    await sleep(150); // 再留一帧给 React/Slate 提交内部状态
+    try {
+      el.focus();
+      el.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          key: 'Enter',
+          code: 'Enter',
+          keyCode: 13,
+          which: 13,
+          bubbles: true,
+          cancelable: true,
+        })
+      );
+    } catch {
+      /* ignore */
+    }
+    setTimeout(() => {
+      outgoingBusy = false;
+    }, 400);
   }
 
   async function handleOutgoingEnter(e) {
@@ -1560,23 +1601,29 @@
 
     if (looksLikeTargetLang(body, target)) {
       // 已经是目标语言：去掉语言前缀后原样发送
-      if (usedPrefix) setComposerText(composer, body);
-      sendComposer(composer);
+      if (usedPrefix) await setComposerText(composer, body);
+      await sendComposer(composer, body);
       return;
     }
 
     outgoingBusy = true;
+    let out = body;
     try {
       const res = await requestTranslation(body, true, target);
-      let out = res && res.ok ? String(res.text || '') : '';
+      out = res && res.ok ? String(res.text || '') : '';
       if (!out || sameTextClient(out, body)) out = body;
       if (settings.outgoingKeepOriginal && out !== body) out = out + '\n' + body;
-      if (!setComposerText(composer, out)) {
-        toast('发送前翻译：无法写入译文，已按原文发送');
-      }
-    } finally {
-      sendComposer(composer);
+    } catch {
+      out = body;
     }
+    const applied = await setComposerText(composer, out);
+    if (!applied) {
+      // 写不进去就取消发送：绝不发混合内容，也不破坏输入框
+      toast('发送前翻译失败：已取消发送（再按一次回车可直接发送原文）');
+      outgoingBusy = false;
+      return;
+    }
+    await sendComposer(composer, out);
   }
 
   /* ---------------- 启动 ---------------- */

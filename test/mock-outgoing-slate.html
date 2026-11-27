@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>Mock Outgoing Slate - 只认 paste 状态</title>
+  <style>
+    body { background: #313338; color: #dbdee1; font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif; padding: 24px; }
+    #composer { min-height: 44px; padding: 10px; background: #383a40; border-radius: 8px; max-width: 520px; outline: none; }
+    #messages { margin-top: 16px; white-space: pre-wrap; color: #8ee08e; max-width: 520px; }
+  </style>
+</head>
+<body>
+  <div id="composer" contenteditable="true"></div>
+  <div id="messages"></div>
+
+  <script>
+    // 模拟 Slate：内部状态只在自己的 paste 处理器里更新；
+    // 直接改 DOM / execCommand 都不会改 state（刻意忽略 input 事件）。
+    const c = document.getElementById('composer');
+    const m = document.getElementById('messages');
+    let state = '';
+    window.__state = () => state;
+    function setText(t) {
+      c.textContent = t;
+      state = t;
+    }
+    c.addEventListener('paste', (e) => {
+      e.preventDefault();
+      const t = (e.clipboardData && e.clipboardData.getData('text/plain')) || '';
+      setText(t);
+    });
+    c.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        const t = (state || '').trim();
+        if (t) m.textContent += '[' + t + ']\n';
+        setText('');
+      }
+    });
+  </script>
+  <script src="harness.js"></script>
+  <script>
+    const __origGet = chrome.storage.sync.get;
+    chrome.storage.sync.get = async (defaults) => ({
+      ...(await __origGet(defaults)),
+      outgoingEnabled: true,
+      outgoingTarget: 'en',
+      target: 'zh-CN',
+    });
+  </script>
+  <script src="../content/content.js"></script>
+</body>
+</html>
