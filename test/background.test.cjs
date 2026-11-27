@@ -91,6 +91,11 @@ globalThis.fetch = async (url, options = {}) => {
     }
     return json({ responseData: { translatedText: '你好，世界' }, responseStatus: 200 });
   }
+  if (u.includes('client=webapp') && u.includes('tk=')) {
+    if (String(options.body || '').includes('CAPTCHA')) return text('<html>sorry</html>');
+    if (syncStore.__googleClassic) return json([[['你好', 'hello', null, null, 1]], null, 'en']);
+    return json([[['你好，世界', 'hello world', null, null, 1]], null, 'en']);
+  }
   if (u.includes('mirror.test')) {
     return json({ sentences: [{ trans: '你好，世界', orig: 'hello world' }], src: 'en' });
   }
@@ -157,6 +162,39 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     }
     assert.ok(err && /格式异常/.test(err.message), '应抛出格式异常');
     ok('Google 限流页面识别');
+  }
+
+  /* 3c. Google tk 令牌：优先带 tk 的 webapp 请求 */
+  {
+    const r = await T.googleTranslate('hello world', 'zh-CN', {});
+    assert.strictEqual(r.text, '你好，世界');
+    const call = fetchCalls.slice().reverse().find((c) => c.url.includes('client=webapp'));
+    assert.ok(call && call.url.includes('&tk='), '应优先带 tk');
+    ok('Google tk 令牌请求');
+  }
+
+  /* 3d. Google：tk 被拦时回退 gtx */
+  {
+    const origFetch = globalThis.fetch;
+    let sawTk = false;
+    let sawGtx = false;
+    globalThis.fetch = async (url, options = {}) => {
+      const u = String(url);
+      if (u.includes('client=webapp')) {
+        sawTk = true;
+        return text('<html>sorry</html>');
+      }
+      if (u.includes('translate.googleapis.com')) {
+        sawGtx = true;
+        return json({ sentences: [{ trans: '你好，世界' }], src: 'en' });
+      }
+      return origFetch(url, options);
+    };
+    const r = await T.googleTranslate('fallback google', 'zh-CN', {});
+    globalThis.fetch = origFetch;
+    assert.strictEqual(r.text, '你好，世界');
+    assert.ok(sawTk && sawGtx, 'tk 失败后应回退 gtx');
+    ok('Google tk 失败回退');
   }
 
   /* 3b. Google 镜像地址（自定义反向代理） */

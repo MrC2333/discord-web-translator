@@ -274,62 +274,125 @@ function guessSourceLang(text) {
 /* 翻译源：Google（gtx 免费接口）                                       */
 /* ------------------------------------------------------------------ */
 
+/* Google 的 tk 令牌算法（经典 TKK 方案，参考 Stichoza/google-translate-php） */
+function googleRl(a, b) {
+  for (let c = 0; c < b.length - 2; c += 3) {
+    let d = b.charCodeAt(c + 2);
+    d = d >= 97 ? d - 87 : d - 48;
+    d = b[c + 1] === '+' ? a >>> d : a << d;
+    a = b[c] === '+' ? (a + d) & 0xffffffff : a ^ d;
+  }
+  return a;
+}
+
+function googleTk(text) {
+  const tkk = [406398, 2087938574];
+  const d = [];
+  let e = 0;
+  for (let f = 0; f < text.length; f++) {
+    let g = text.charCodeAt(f);
+    if (g < 128) {
+      d[e++] = g;
+    } else {
+      if (g < 2048) {
+        d[e++] = (g >> 6) | 192;
+      } else {
+        if (
+          (g & 0xfc00) === 0xd800 &&
+          f + 1 < text.length &&
+          (text.charCodeAt(f + 1) & 0xfc00) === 0xdc00
+        ) {
+          g = 0x10000 + ((g & 0x3ff) << 10) + (text.charCodeAt(++f) & 0x3ff);
+          d[e++] = (g >> 18) | 240;
+          d[e++] = ((g >> 12) & 63) | 128;
+        } else {
+          d[e++] = (g >> 12) | 224;
+        }
+        d[e++] = ((g >> 6) & 63) | 128;
+      }
+      d[e++] = (g & 63) | 128;
+    }
+  }
+  let a = tkk[0];
+  for (const v of d) {
+    a += v;
+    a = googleRl(a, '+-a^+6');
+  }
+  a = googleRl(a, '+-3^+b+-f');
+  a ^= tkk[1];
+  if (a < 0) a = (a & 0x7fffffff) + 0x80000000;
+  a = a % 1000000;
+  return a + '.' + (a ^ tkk[0]);
+}
+
+async function googleRequest(base, chunk, tl, useTk) {
+  const url = useTk
+    ? base +
+      '/translate_a/single?client=webapp&hl=en&dt=t&sl=auto&tl=' +
+      encodeURIComponent(tl) +
+      '&ie=UTF-8&oe=UTF-8&tk=' +
+      encodeURIComponent(googleTk(chunk))
+    : base + '/translate_a/single?client=gtx&sl=auto&tl=' + encodeURIComponent(tl) + '&dt=t&dj=1';
+  const res = await limited('google', () =>
+    fetchWithTimeout(
+      url,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+        body: 'q=' + encodeURIComponent(chunk),
+      },
+      5000
+    )
+  );
+  if (res.status === 429 || res.status >= 500) {
+    const err = new Error('Google HTTP ' + res.status);
+    err.retryable = true;
+    throw err;
+  }
+  if (!res.ok) throw new Error('Google HTTP ' + res.status);
+  const raw = await res.text();
+  let data = null;
+  try {
+    data = JSON.parse(raw);
+  } catch {
+    throw new Error('Google 返回格式异常（可能被限流，请换翻译源）');
+  }
+  const t = Array.isArray(data)
+    ? (data[0] || []).map((s) => (s && s[0]) || '').join('')
+    : (data.sentences || []).map((s) => s.trans || '').join('');
+  if (!t) throw new Error('Google 返回为空');
+  return { text: t, lang: (Array.isArray(data) ? data[2] : data.src) || '' };
+}
+
 async function googleTranslate(text, target, settings) {
   const tl = target;
   const mirror =
-    settings && typeof settings.googleUrl === 'string' ? settings.googleUrl.trim().replace(/\/+$/, '') : '';
+    settings && typeof settings.googleUrl === 'string'
+      ? settings.googleUrl.trim().replace(/\/+$/, '')
+      : '';
   const base = mirror || 'https://translate.googleapis.com';
   const parts = [];
   let lang = '';
   for (const chunk of splitText(text, 1500)) {
-    const url =
-      base +
-      '/translate_a/single?client=gtx&sl=auto&tl=' +
-      encodeURIComponent(tl) +
-      '&dt=t&dj=1';
     let lastErr = null;
-    for (let attempt = 0; attempt < 2; attempt++) {
+    let ok = false;
+    // 先带 tk（client=webapp），失败再回退到老的 gtx 方式
+    for (const useTk of [true, false]) {
       try {
-        const res = await limited('google', () =>
-          fetchWithTimeout(
-            url,
-            {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
-              body: 'q=' + encodeURIComponent(chunk),
-            },
-            5000
-          )
-        );
-        if (res.status === 429 || res.status >= 500) {
-          const err = new Error('Google HTTP ' + res.status);
-          err.retryable = true;
-          throw err;
-        }
-        if (!res.ok) throw new Error('Google HTTP ' + res.status);
-        const raw = await res.text();
-        let data = null;
-        try {
-          data = JSON.parse(raw);
-        } catch {
-          throw new Error('Google 返回格式异常（可能被限流，请换翻译源）');
-        }
-        lang = lang || (Array.isArray(data) ? data[2] : data.src) || '';
-        const t = Array.isArray(data)
-          ? (data[0] || []).map((s) => (s && s[0]) || '').join('')
-          : (data.sentences || []).map((s) => s.trans || '').join('');
-        parts.push(t);
-        lastErr = null;
+        const r = await googleRequest(base, chunk, tl, useTk);
+        parts.push(r.text);
+        lang = lang || r.lang;
+        ok = true;
         break;
       } catch (e) {
         lastErr = e;
-        if (e && e.name === 'AbortError') e.retryable = true;
-        // 网络级失败（被墙/DNS）重试没有意义，直接交给下一个源
-        if (!e.retryable || attempt === 1) break;
-        await sleep(400);
+        // 网络层失败（被墙/DNS/TLS）换参数也没用，直接失败，避免多等一轮
+        const netErr =
+          (e && e.name === 'AbortError') || /Failed to fetch|NetworkError|Load failed/i.test(String((e && e.message) || ''));
+        if (netErr) break;
       }
     }
-    if (lastErr) throw lastErr;
+    if (!ok) throw lastErr || new Error('Google 翻译失败');
   }
   return { text: parts.join('\n'), lang };
 }
@@ -928,7 +991,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true; // 异步响应
   }
   if (msg.type === 'ping') {
-    sendResponse({ ok: true, version: '1.4.10' });
+    sendResponse({ ok: true, version: '1.4.11' });
     return;
   }
   if (msg.type === 'reset-health') {
