@@ -3,7 +3,7 @@
 自动识别 **Discord** 与 **Telegram 网页版**里的外语消息，并在消息下方追加译文。面向中文用户设计，默认翻译成简体中文，也可切换目标语言。
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.4.9-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.4.10-blue.svg)](CHANGELOG.md)
 [![Manifest V3](https://img.shields.io/badge/Manifest-V3-5865F2.svg)](manifest.json)
 
 > 支持 Chrome / Edge 等 Chromium 内核浏览器（Manifest V3）。支持 Discord 网页版、Telegram Web K（`web.telegram.org/k`）与 Web A（`web.telegram.org/a`），不适用于桌面客户端。
@@ -20,7 +20,7 @@
 - **引用消息翻译**（Discord）：回复消息里被引用的内容会单独翻译，显示在引用行下方
 - **已编辑消息**（Discord）：带「(已编辑)」标记的消息照常翻译，标记和时间戳不会混进译文
 - **链接卡片翻译**（Discord）：链接预览 / 机器人卡片里的标题与描述会翻译，显示在卡片下方
-- **多种翻译源**：Google、腾讯翻译君、Bing、MyMemory、DeepL、有道智云、LibreTranslate、大模型，以及**浏览器内置端侧翻译（离线、免 Key）**
+- **多种翻译源**：Google、腾讯翻译君、Bing、MyMemory、DeepL、有道智云、LibreTranslate、大模型、腾讯混元（`hunyuan-lite` 免费），以及**浏览器内置端侧翻译（离线、免 Key）**
 - **离线兜底**：所有网络翻译源都不可用时，点一次「下载内置翻译包」即可用浏览器自带翻译离线工作（Chrome/Edge 138+）
 - **自动切换**：某个源失败、限流或语种不支持时自动换下一个；已配置的 DeepL / 有道 / LibreTranslate / 大模型会自动加入切换队列
 - **原文保留**：译文以「译」块追加，不覆盖原文；点击「译」可收起/展开
@@ -196,7 +196,7 @@ git remote add origin https://github.com/<your-name>/discord-web-translator.git
 git push -u origin main
 ```
 
-打 Release 时，把仓库根目录打包为 `discord-translator-1.4.9.zip`（包含 `manifest.json` 及其引用文件即可）上传到 Releases。CI 会在 push/PR 时自动运行 `npm test`。
+打 Release 时，把仓库根目录打包为 `discord-translator-1.4.10.zip`（包含 `manifest.json` 及其引用文件即可）上传到 Releases。CI 会在 push/PR 时自动运行 `npm test`。
 
 ---
 

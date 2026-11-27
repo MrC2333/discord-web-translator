@@ -107,6 +107,9 @@ globalThis.fetch = async (url, options = {}) => {
     }
     return json({ sentences: [{ trans: '你好，世界', orig: 'hello world' }], src: 'en' });
   }
+  if (u.includes('api.hunyuan.cloud.tencent.com')) {
+    return json({ choices: [{ message: { content: '你好，世界' } }] });
+  }
   if (u.includes('deepl.com')) {
     return json({ translations: [{ text: '你好，世界', detected_source_language: 'EN' }] });
   }
@@ -205,6 +208,34 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     assert.ok(call, '应请求自定义镜像地址');
     assert.ok(call.url.startsWith('https://mirror.test/translate_a/single'), '路径应拼接到镜像地址');
     ok('Google 镜像地址生效');
+  }
+
+  /* 混元：OpenAI 兼容接口 */
+  {
+    const r = await T.hunyuanTranslate('hello world', 'zh-CN', { hunyuanKey: 'sk-test' });
+    assert.strictEqual(r.text, '你好，世界');
+    const call = fetchCalls.slice().reverse().find((c) => c.url.includes('api.hunyuan.cloud.tencent.com'));
+    assert.ok(call, '应请求混元接口');
+    assert.strictEqual(call.options.headers.Authorization, 'Bearer sk-test');
+    assert.ok(call.url.endsWith('/chat/completions'), '应走 OpenAI 兼容路径');
+    ok('腾讯混元接口');
+  }
+
+  /* auto 模式：免费源全挂时用混元兜底 */
+  {
+    T.resetHealth();
+    const origFetch = globalThis.fetch;
+    globalThis.fetch = async (url) => {
+      if (String(url).includes('api.hunyuan.cloud.tencent.com')) {
+        return json({ choices: [{ message: { content: '混元译文' } }] });
+      }
+      throw new Error('offline');
+    };
+    const r = await T.translateText('hunyuan auto test', 'zh-CN', 'auto', { hunyuanKey: 'sk-test' });
+    globalThis.fetch = origFetch;
+    assert.strictEqual(r.provider, 'hunyuan');
+    assert.strictEqual(r.text, '混元译文');
+    ok('auto 模式使用混元兜底');
   }
 
   /* 4. Bing 网页版翻译（cn.bing.com） */  {

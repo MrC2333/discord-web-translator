@@ -8,6 +8,8 @@ const DEFAULTS = {
   llmBase: 'https://api.deepseek.com/v1',
   llmKey: '',
   llmModel: 'deepseek-chat',
+  hunyuanKey: '',
+  hunyuanModel: 'hunyuan-lite',
   deeplKey: '',
   youdaoAppKey: '',
   youdaoAppSecret: '',
@@ -53,6 +55,8 @@ function readForm() {
     llmBase: $('llmBase').value.trim(),
     llmKey: $('llmKey').value.trim(),
     llmModel: $('llmModel').value.trim() || 'deepseek-chat',
+    hunyuanKey: $('hunyuanKey').value.trim(),
+    hunyuanModel: $('hunyuanModel').value.trim() || 'hunyuan-turbos-latest',
     deeplKey: $('deeplKey').value.trim(),
     youdaoAppKey: $('youdaoAppKey').value.trim(),
     youdaoAppSecret: $('youdaoAppSecret').value.trim(),
@@ -145,6 +149,8 @@ async function init() {
   $('llmBase').value = settings.llmBase;
   $('llmKey').value = settings.llmKey;
   $('llmModel').value = settings.llmModel;
+  $('hunyuanKey').value = settings.hunyuanKey || '';
+  $('hunyuanModel').value = settings.hunyuanModel || 'hunyuan-turbos-latest';
   $('deeplKey').value = settings.deeplKey || '';
   $('youdaoAppKey').value = settings.youdaoAppKey || '';
   $('youdaoAppSecret').value = settings.youdaoAppSecret || '';

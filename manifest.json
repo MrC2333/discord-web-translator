@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Discord / Telegram 外语翻译器",
   "short_name": "DXT",
-  "version": "1.4.9",
+  "version": "1.4.10",
   "description": "自动翻译 Discord 与 Telegram 网页版里的外语消息，支持 Google、腾讯、Bing、DeepL、有道、大模型等多种翻译源。",
   "minimum_chrome_version": "116",
   "permissions": ["storage"],
@@ -18,7 +18,8 @@
     "https://api.deepl.com/*",
     "https://openapi.youdao.com/*",
     "https://api.deepseek.com/*",
-    "https://api.openai.com/*"
+    "https://api.openai.com/*",
+    "https://api.hunyuan.cloud.tencent.com/*"
   ],
   "optional_host_permissions": ["https://*/*", "http://localhost/*", "http://127.0.0.1/*"],
   "content_scripts": [

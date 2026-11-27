@@ -32,5 +32,6 @@ window.DXT_PROVIDERS = [
   { value: 'deepl', label: 'DeepL（需 API Key）' },
   { value: 'youdao', label: '有道智云（需 Key，国内直连）' },
   { value: 'libre', label: 'LibreTranslate（自建实例）' },
+  { value: 'hunyuan', label: '腾讯混元（需 API Key，国内直连）' },
   { value: 'llm', label: '大模型（DeepSeek / OpenAI 兼容）' },
 ];

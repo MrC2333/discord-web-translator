@@ -118,7 +118,7 @@ check('代码使用的翻译域名都在 host_permissions 中', () => {
     'https://api-free.deepl.com',
     'https://openapi.youdao.com',
   ];
-  const optional = ['https://api.deepseek.com', 'https://api.openai.com'];
+  const optional = ['https://api.deepseek.com', 'https://api.openai.com', 'https://api.hunyuan.cloud.tencent.com'];
   for (const h of builtin) {
     must(sw.includes(h), '代码里未使用 ' + h);
     must([...hosts].some((p) => p.startsWith(h + '/')), 'host_permissions 缺少 ' + h);

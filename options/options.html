@@ -102,6 +102,22 @@
       </label>
     </section>
 
+    <section class="card" id="hunyuanCard">
+      <h2>腾讯混元（可选，国内直连）</h2>
+      <p class="hint">
+        使用腾讯混元的 OpenAI 兼容接口，一个 API Key 即可；在
+        <code>console.cloud.tencent.com/hunyuan/start</code> 创建 API Key。填了会自动参与「自动」切换。
+      </p>
+      <label class="row">
+        <span class="label">混元 API Key</span>
+        <input type="password" id="hunyuanKey" placeholder="sk-..." autocomplete="off" />
+      </label>
+      <label class="row">
+        <span class="label">模型名称</span>
+        <input type="text" id="hunyuanModel" placeholder="hunyuan-lite" />
+      </label>
+    </section>
+
     <section class="card">
       <h2>更多翻译源（可选，填了自动参与切换）</h2>
       <p class="hint">
@@ -157,6 +173,7 @@
         <li>链接预览、机器人卡片里的标题和描述也会翻译，显示在卡片下方（Discord）。</li>
         <li>「自动」模式会按 浏览器内置 → Google → 腾讯翻译君 → Bing → MyMemory →（已配置的 DeepL/有道/LibreTranslate/大模型）依次切换，一个不可用就自动换下一个。</li>
         <li><b>浏览器内置（离线，免 Key）</b>：使用 Chrome/Edge 自带的端侧翻译，首次点一次页面上的「下载内置翻译包」即可，之后完全离线、无额度限制；网络翻译源全部失效时它也能兜底。</li>
+        <li><b>腾讯混元</b>：在 <code>console.cloud.tencent.com/hunyuan/start</code> 创建 API Key 填入即可；默认 <code>hunyuan-lite</code> 免费，国内直连。</li>
         <li>腾讯翻译君不支持俄语等部分语种；这类消息建议使用 Google（需代理）、有道智云或大模型。</li>
         <li><b>Google 镜像地址</b>：如果你的网络能访问 Google、但官方接口被验证码拦截，填一个反向代理地址即可（Cloudflare Worker 转发到 <code>translate.googleapis.com</code>）。</li>
         <li>消息内容只会发送给所选的翻译服务，扩展不会上传其它数据；缓存仅保存在本地。</li>

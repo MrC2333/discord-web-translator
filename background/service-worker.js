@@ -14,6 +14,9 @@ const DEFAULTS = {
   llmBase: 'https://api.deepseek.com/v1',
   llmKey: '',
   llmModel: 'deepseek-chat',
+  // 腾讯混元（OpenAI 兼容接口，一个 API Key 即可）
+  hunyuanKey: '',
+  hunyuanModel: 'hunyuan-lite',
   deeplKey: '',
   youdaoAppKey: '',
   youdaoAppSecret: '',
@@ -671,6 +674,23 @@ async function llmTranslate(text, target, settings) {
 }
 
 /* ------------------------------------------------------------------ */
+/* 翻译源：腾讯混元（OpenAI 兼容接口，一个 API Key 即可）                */
+/* ------------------------------------------------------------------ */
+
+const HUNYUAN_BASE = 'https://api.hunyuan.cloud.tencent.com/v1';
+
+async function hunyuanTranslate(text, target, settings) {
+  const key = String((settings && settings.hunyuanKey) || '').trim();
+  if (!key) throw new Error('未配置腾讯混元 API Key（请在扩展设置中填写）');
+  return llmTranslate(text, target, {
+    ...settings,
+    llmBase: HUNYUAN_BASE,
+    llmKey: key,
+    llmModel: String((settings && settings.hunyuanModel) || '').trim() || 'hunyuan-lite',
+  });
+}
+
+/* ------------------------------------------------------------------ */
 /* 翻译源：DeepL（官方 API，免费 Key 每月 50 万字符）                  */
 /* ------------------------------------------------------------------ */
 
@@ -826,6 +846,7 @@ const PROVIDER_LABELS = {
   deepl: 'DeepL',
   youdao: '有道智云',
   libre: 'LibreTranslate',
+  hunyuan: '腾讯混元',
   llm: '大模型',
 };
 
@@ -852,6 +873,8 @@ async function runProvider(provider, text, target, settings) {
       return await libreTranslate(text, target, settings);
     case 'llm':
       return await llmTranslate(text, target, settings);
+    case 'hunyuan':
+      return await hunyuanTranslate(text, target, settings);
     default:
       throw new Error('未知翻译源：' + provider);
   }
@@ -872,6 +895,7 @@ async function translateText(text, target, provider, settings) {
       all.push('libre');
     }
     if (settings && settings.llmKey && settings.llmKey.trim()) all.push('llm');
+    if (settings && settings.hunyuanKey && settings.hunyuanKey.trim()) all.push('hunyuan');
     if (!all.length) throw new Error('该语言暂无可用翻译源，请改用 Google 或大模型');
   } else {
     if (!providerSupports(provider, target)) {
@@ -991,7 +1015,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true; // 异步响应
   }
   if (msg.type === 'ping') {
-    sendResponse({ ok: true, version: '1.4.9' });
+    sendResponse({ ok: true, version: '1.4.10' });
     return;
   }
   if (msg.type === 'reset-health') {
@@ -1008,6 +1032,7 @@ globalThis.__DXT_TEST__ = {
   bingTranslate,
   myMemoryTranslate,
   llmTranslate,
+  hunyuanTranslate,
   translateText,
   handleTranslate,
   splitText,

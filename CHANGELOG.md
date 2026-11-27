@@ -2,6 +2,15 @@
 
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [1.4.10] - 2026-11-27
+
+### 新增
+- **腾讯混元翻译源**：接入混元 OpenAI 兼容接口 `https://api.hunyuan.cloud.tencent.com/v1`，只需一个 API Key；默认模型 `hunyuan-lite`（免费），可改为 `hunyuan-turbos-latest` 提升质量
+- 填写混元 Key 后自动加入「自动」切换，作为国内直连的兜底源
+
+### 说明
+- `hunyuan.ai.tencentcloudapi.com` 是腾讯云 TC3 签名接口（需 SecretId/SecretKey）；本次接入的是同一服务的 OpenAI 兼容入口（一个 API Key 即可）
+
 ## [1.4.9] - 2026-11-27
 
 ### 修复
