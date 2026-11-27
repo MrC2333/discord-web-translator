@@ -330,61 +330,93 @@ async function googleTranslate(text, target) {
 }
 
 /* ------------------------------------------------------------------ */
-/* 翻译源：Bing（Edge 网页翻译的免费接口）                              */
+/* 翻译源：Bing（网页版 translator 免费接口；cn.bing.com 国内可用）      */
 /* ------------------------------------------------------------------ */
 
-let bingToken = { value: '', exp: 0 };
+let bingSession = { host: '', ig: '', iid: '', key: '', token: '', exp: 0 };
 
-async function bingAuth() {
-  if (bingToken.value && Date.now() < bingToken.exp) return bingToken.value;
-  const res = await limited('bing', () =>
-    fetchWithTimeout(
-      'https://edge.microsoft.com/translate/auth',
-      {
-        headers: { Accept: 'text/plain' },
-      },
-      5000
-    )
-  );
-  if (!res.ok) throw new Error('Bing 鉴权失败 HTTP ' + res.status);
-  const token = (await res.text()).trim();
-  if (!token || token.length < 50 || !token.includes('.')) throw new Error('Bing 鉴权信息异常');
-  let exp = Date.now() + 8 * 60000;
-  try {
-    const p = JSON.parse(atob(token.split('.')[1]));
-    if (p && p.exp) exp = p.exp * 1000 - 60000;
-  } catch {
-    /* JWT 解析失败则用保守过期时间 */
+const BING_HOSTS = ['https://cn.bing.com', 'https://www.bing.com'];
+let bingHostIdx = 0;
+
+function parseBingPage(html) {
+  const ig = (html.match(/IG:"([0-9A-F]+)"/i) || [])[1];
+  const iid = (html.match(/data-iid="([^"]+)"/) || [])[1];
+  const helper = (html.match(/params_AbusePreventionHelper\s*=\s*\[([^\]]+)\]/) || [])[1] || '';
+  const parts = helper.split(',').map((x) => x.trim().replace(/^"|"$/g, ''));
+  if (!ig || !iid || !parts[0] || !parts[1]) return null;
+  return { ig, iid, key: parts[0], token: parts[1] };
+}
+
+async function bingGetSession(force = false) {
+  if (!force && bingSession.token && Date.now() < bingSession.exp) return bingSession;
+  let lastErr = null;
+  for (let i = 0; i < BING_HOSTS.length; i++) {
+    const host = BING_HOSTS[(bingHostIdx + i) % BING_HOSTS.length];
+    try {
+      const res = await limited('bing', () =>
+        fetchWithTimeout(
+          host + '/translator',
+          {
+            headers: { Accept: 'text/html', 'Accept-Language': 'zh-CN,zh;q=0.9' },
+            credentials: 'include',
+          },
+          8000
+        )
+      );
+      if (!res.ok) throw new Error('Bing 页面 HTTP ' + res.status);
+      const html = await res.text();
+      const sess = parseBingPage(html);
+      if (!sess) throw new Error('Bing 页面缺少翻译参数');
+      let servedHost = host;
+      try {
+        const u = new URL(res.url);
+        if (u.origin) servedHost = u.origin;
+      } catch {
+        /* 保留原 host */
+      }
+      bingHostIdx = (bingHostIdx + i) % BING_HOSTS.length;
+      bingSession = { host: servedHost, ...sess, exp: Date.now() + 30 * 60000 };
+      return bingSession;
+    } catch (e) {
+      lastErr = e;
+    }
   }
-  bingToken = { value: token, exp };
-  return token;
+  throw lastErr || new Error('Bing 页面不可用');
 }
 
 async function bingTranslate(text, target) {
   const tl = (TARGET_MAP.bing && TARGET_MAP.bing[target]) || target;
-  const url =
-    'https://api-edge.cognitive.microsofttranslator.com/translate?api-version=3.0&from=&to=' +
-    encodeURIComponent(tl) +
-    '&includeSentenceLength=true';
   let lastErr = null;
-  for (let attempt = 0; attempt < 2; attempt++) {
+  for (let attempt = 0; attempt < 3; attempt++) {
     try {
-      const token = await bingAuth();
+      const sess = await bingGetSession(attempt > 0);
+      const body = new URLSearchParams({
+        fromLang: 'auto-detect',
+        text,
+        to: tl,
+        token: sess.token,
+        key: sess.key,
+      }).toString();
       const res = await limited('bing', () =>
         fetchWithTimeout(
-          url,
+          sess.host + '/ttranslatev3?isVertical=1&&IG=' + sess.ig + '&IID=' + encodeURIComponent(sess.iid),
           {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-            body: JSON.stringify([{ Text: text }]),
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded',
+              Accept: 'application/json',
+            },
+            credentials: 'include',
+            body,
           },
-          5000
+          8000
         )
       );
-      if (res.status === 401) {
-        bingToken.value = '';
-        const err = new Error('Bing 鉴权过期');
-        err.retryable = attempt === 0;
+      if (res.status === 401 || res.status === 403) {
+        bingSession.exp = 0;
+        bingHostIdx = (bingHostIdx + 1) % BING_HOSTS.length;
+        const err = new Error('Bing HTTP ' + res.status);
+        err.retryable = true;
         throw err;
       }
       if (res.status === 429 || res.status >= 500) {
@@ -393,22 +425,35 @@ async function bingTranslate(text, target) {
         throw err;
       }
       if (!res.ok) throw new Error('Bing HTTP ' + res.status);
-      const data = await res.json();
+      const raw = await res.text();
+      if (!raw.trim()) {
+        bingSession.exp = 0;
+        bingHostIdx = (bingHostIdx + 1) % BING_HOSTS.length;
+        const err = new Error('Bing 返回为空');
+        err.retryable = true;
+        throw err;
+      }
+      let data;
+      try {
+        data = JSON.parse(raw);
+      } catch {
+        bingSession.exp = 0;
+        throw new Error('Bing 返回格式异常');
+      }
       const item = Array.isArray(data) ? data[0] : null;
       const translation = item && item.translations && item.translations[0];
       if (!translation || !translation.text) throw new Error('Bing 返回为空');
       return { text: translation.text, lang: (item.detectedLanguage || {}).language || '' };
     } catch (e) {
       lastErr = e;
-      if (e && e.name === 'AbortError') e.retryable = true;
-      if (!e.retryable || attempt === 1) break;
+      if (e && e.name === 'AbortError') break;
+      if (!e.retryable || attempt === 2) break;
       await sleep(400);
     }
   }
   throw lastErr;
 }
 
-/* ------------------------------------------------------------------ */
 /* 翻译源：腾讯翻译君（网页版接口，国内可直连、免 Key）                  */
 /* ------------------------------------------------------------------ */
 
@@ -878,7 +923,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true; // 异步响应
   }
   if (msg.type === 'ping') {
-    sendResponse({ ok: true, version: '1.4.8' });
+    sendResponse({ ok: true, version: '1.4.9' });
     return;
   }
   if (msg.type === 'reset-health') {

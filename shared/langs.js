@@ -27,7 +27,7 @@ window.DXT_PROVIDERS = [
   { value: 'builtin', label: '浏览器内置（离线，免 Key）' },
   { value: 'google', label: 'Google 翻译' },
   { value: 'tencent', label: '腾讯翻译君（国内可用）' },
-  { value: 'bing', label: 'Bing 翻译' },
+  { value: 'bing', label: 'Bing 翻译（国内可用，免 Key）' },
   { value: 'mymemory', label: 'MyMemory（免费额度有限）' },
   { value: 'deepl', label: 'DeepL（需 API Key）' },
   { value: 'youdao', label: '有道智云（需 Key，国内直连）' },

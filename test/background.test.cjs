@@ -54,9 +54,16 @@ globalThis.fetch = async (url, options = {}) => {
   fetchCalls.push({ url: String(url), options });
   const u = String(url);
 
-  if (u.includes('edge.microsoft.com/translate/auth')) return text(jwt);
-  if (u.includes('api-edge.cognitive.microsofttranslator.com/translate')) {
-    return json([{ translations: [{ text: '你好，世界', to: 'zh-Hans' }], detectedLanguage: { language: 'en' } }]);
+  if (u.includes('cn.bing.com/translator') || u.includes('www.bing.com/translator')) {
+    return text(
+      '<html><script>var params_AbusePreventionHelper = [1795754774393,"TOKEN123",3600000];</script>' +
+        '<div data-iid="translator.5023"></div><script>IG:"49D9021A58264985821928461241A358"</script></html>'
+    );
+  }
+  if (u.includes('/ttranslatev3')) {
+    return json([
+      { translations: [{ text: '你好，世界', to: 'zh-Hans' }], detectedLanguage: { language: 'en' } },
+    ]);
   }
   if (u.includes('transmart.qq.com')) {
     let body = {};
@@ -149,13 +156,13 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     ok('Google 限流页面识别');
   }
 
-  /* 4. Bing 鉴权 + 翻译 */
+  /* 4. Bing 网页版翻译（cn.bing.com） */
   {
     syncStore.__x = 1;
     const r = await T.bingTranslate('hello world', 'zh-CN');
     assert.strictEqual(r.text, '你好，世界');
     assert.strictEqual(r.lang, 'en');
-    ok('Bing 鉴权与翻译解析');
+    ok('Bing 网页版翻译解析');
   }
 
   /* 4b. 腾讯翻译君：成功与引擎不支持 */

@@ -151,7 +151,7 @@ async function httpJson(url) {
       '--load-extension=' + EXT,
       '--disable-extensions-except=' + EXT,
       '--remote-debugging-port=' + PORT,
-      '--headless=new',
+      ...(process.env.E2E_HEADFUL ? [] : ['--headless=new']),
       '--no-first-run',
       '--no-default-browser-check',
       '--disable-gpu',

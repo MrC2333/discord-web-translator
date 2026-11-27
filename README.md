@@ -3,7 +3,7 @@
 自动识别 **Discord** 与 **Telegram 网页版**里的外语消息，并在消息下方追加译文。面向中文用户设计，默认翻译成简体中文，也可切换目标语言。
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.4.8-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.4.9-blue.svg)](CHANGELOG.md)
 [![Manifest V3](https://img.shields.io/badge/Manifest-V3-5865F2.svg)](manifest.json)
 
 > 支持 Chrome / Edge 等 Chromium 内核浏览器（Manifest V3）。支持 Discord 网页版、Telegram Web K（`web.telegram.org/k`）与 Web A（`web.telegram.org/a`），不适用于桌面客户端。
@@ -141,7 +141,8 @@ npm run test:e2e
 
 - `test/validate.cjs`：manifest、文件引用、脚本语法、UTF-8 编码、权限域名
 - `test/background.test.cjs`：翻译源解析、回退、熔断、缓存等（mock fetch）
-- `test/e2e-extension.mjs`：无头 Edge 加载扩展，验证 Service Worker、设置页、discord.com 注入、引用/已编辑消息与划词翻译
+- `test/e2e-extension.mjs`：真实 Edge 加载扩展，验证 Service Worker、设置页、discord.com 注入、引用/已编辑消息、划词翻译与 Telegram
+- 端到端默认无头运行；需要验证真实翻译源时用 `set E2E_HEADFUL=1`（无头浏览器会被 Bing 等站点风控返回 401）
 - `test/mock-discord.html`：模拟 Discord DOM 的交互测试页（自带 chrome API 桩，直接用浏览器打开）
 - `test/mock-telegram-k.html` / `test/mock-telegram-a.html`：模拟 Telegram Web K / A 的消息结构
 
@@ -194,7 +195,7 @@ git remote add origin https://github.com/<your-name>/discord-web-translator.git
 git push -u origin main
 ```
 
-打 Release 时，把仓库根目录打包为 `discord-translator-1.4.8.zip`（包含 `manifest.json` 及其引用文件即可）上传到 Releases。CI 会在 push/PR 时自动运行 `npm test`。
+打 Release 时，把仓库根目录打包为 `discord-translator-1.4.9.zip`（包含 `manifest.json` 及其引用文件即可）上传到 Releases。CI 会在 push/PR 时自动运行 `npm test`。
 
 ---
 

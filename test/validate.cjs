@@ -112,8 +112,8 @@ check('代码使用的翻译域名都在 host_permissions 中', () => {
   const builtin = [
     'https://translate.googleapis.com',
     'https://transmart.qq.com',
-    'https://edge.microsoft.com',
-    'https://api-edge.cognitive.microsofttranslator.com',
+    'https://cn.bing.com',
+    'https://www.bing.com',
     'https://api.mymemory.translated.net',
     'https://api-free.deepl.com',
     'https://openapi.youdao.com',
