@@ -38,6 +38,15 @@
       </label>
 
       <label class="row">
+        <span class="label">Google 镜像地址（可选）</span>
+        <input type="url" id="googleUrl" placeholder="https://你的-worker.workers.dev" />
+      </label>
+      <p class="hint">
+        网络能访问 Google、但官方接口被验证码拦截时，填一个反向代理地址即可；留空则用官方接口。
+        可用 Cloudflare Worker 转发：<code>fetch('https://translate.googleapis.com' + new URL(req.url).pathname + new URL(req.url).search)</code>
+      </p>
+
+      <label class="row">
         <span class="label">显示页面悬浮开关</span>
         <label class="switch">
           <input type="checkbox" id="showFab" />
@@ -149,6 +158,7 @@
         <li>「自动」模式会按 浏览器内置 → Google → 腾讯翻译君 → Bing → MyMemory →（已配置的 DeepL/有道/LibreTranslate/大模型）依次切换，一个不可用就自动换下一个。</li>
         <li><b>浏览器内置（离线，免 Key）</b>：使用 Chrome/Edge 自带的端侧翻译，首次点一次页面上的「下载内置翻译包」即可，之后完全离线、无额度限制；网络翻译源全部失效时它也能兜底。</li>
         <li>腾讯翻译君不支持俄语等部分语种；这类消息建议使用 Google（需代理）、有道智云或大模型。</li>
+        <li><b>Google 镜像地址</b>：如果你的网络能访问 Google、但官方接口被验证码拦截，填一个反向代理地址即可（Cloudflare Worker 转发到 <code>translate.googleapis.com</code>）。</li>
         <li>消息内容只会发送给所选的翻译服务，扩展不会上传其它数据；缓存仅保存在本地。</li>
       </ul>
     </section>

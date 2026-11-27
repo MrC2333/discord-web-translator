@@ -91,6 +91,9 @@ globalThis.fetch = async (url, options = {}) => {
     }
     return json({ responseData: { translatedText: '你好，世界' }, responseStatus: 200 });
   }
+  if (u.includes('mirror.test')) {
+    return json({ sentences: [{ trans: '你好，世界', orig: 'hello world' }], src: 'en' });
+  }
   if (u.includes('translate.googleapis.com')) {
     const body = options.body || '';
     if (body.includes('CAPTCHA')) return text('<html>sorry</html>');
@@ -156,8 +159,17 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     ok('Google 限流页面识别');
   }
 
-  /* 4. Bing 网页版翻译（cn.bing.com） */
+  /* 3b. Google 镜像地址（自定义反向代理） */
   {
+    const r = await T.googleTranslate('hello world', 'zh-CN', { googleUrl: 'https://mirror.test/' });
+    assert.strictEqual(r.text, '你好，世界');
+    const call = fetchCalls.slice().reverse().find((c) => c.url.includes('mirror.test'));
+    assert.ok(call, '应请求自定义镜像地址');
+    assert.ok(call.url.startsWith('https://mirror.test/translate_a/single'), '路径应拼接到镜像地址');
+    ok('Google 镜像地址生效');
+  }
+
+  /* 4. Bing 网页版翻译（cn.bing.com） */  {
     syncStore.__x = 1;
     const r = await T.bingTranslate('hello world', 'zh-CN');
     assert.strictEqual(r.text, '你好，世界');

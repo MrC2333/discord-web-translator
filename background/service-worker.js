@@ -19,6 +19,7 @@ const DEFAULTS = {
   youdaoAppSecret: '',
   libreUrl: '',
   libreKey: '',
+  googleUrl: '', // 可选：Google 反向代理 / 镜像地址（本机网络被验证码拦截时用）
   showFab: true,
   skipSameLang: true,
 };
@@ -273,13 +274,17 @@ function guessSourceLang(text) {
 /* 翻译源：Google（gtx 免费接口）                                       */
 /* ------------------------------------------------------------------ */
 
-async function googleTranslate(text, target) {
+async function googleTranslate(text, target, settings) {
   const tl = target;
+  const mirror =
+    settings && typeof settings.googleUrl === 'string' ? settings.googleUrl.trim().replace(/\/+$/, '') : '';
+  const base = mirror || 'https://translate.googleapis.com';
   const parts = [];
   let lang = '';
   for (const chunk of splitText(text, 1500)) {
     const url =
-      'https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=' +
+      base +
+      '/translate_a/single?client=gtx&sl=auto&tl=' +
       encodeURIComponent(tl) +
       '&dt=t&dj=1';
     let lastErr = null;
@@ -769,7 +774,7 @@ function providerSupports(provider, target) {
 async function runProvider(provider, text, target, settings) {
   switch (provider) {
     case 'google':
-      return await googleTranslate(text, target);
+      return await googleTranslate(text, target, settings);
     case 'tencent':
       return await tencentTranslate(text, target);
     case 'bing':
@@ -923,7 +928,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true; // 异步响应
   }
   if (msg.type === 'ping') {
-    sendResponse({ ok: true, version: '1.4.9' });
+    sendResponse({ ok: true, version: '1.4.10' });
     return;
   }
   if (msg.type === 'reset-health') {

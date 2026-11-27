@@ -13,6 +13,7 @@ const DEFAULTS = {
   youdaoAppSecret: '',
   libreUrl: '',
   libreKey: '',
+  googleUrl: '',
   showFab: true,
   skipSameLang: true,
   selectionTranslate: true,
@@ -57,6 +58,7 @@ function readForm() {
     youdaoAppSecret: $('youdaoAppSecret').value.trim(),
     libreUrl: $('libreUrl').value.trim(),
     libreKey: $('libreKey').value.trim(),
+    googleUrl: $('googleUrl').value.trim(),
     showFab: $('showFab').checked,
     skipSameLang: $('skipSameLang').checked,
     selectionTranslate: $('selectionTranslate').checked,
@@ -89,7 +91,8 @@ async function applyForm() {
   const s = readForm();
   const okLlm = await ensureHostPermission(s.llmBase);
   const okLibre = s.libreUrl ? await ensureHostPermission(s.libreUrl) : true;
-  if ((!okLlm && s.provider === 'llm') || (!okLibre && s.libreUrl)) {
+  const okGoogle = s.googleUrl ? await ensureHostPermission(s.googleUrl) : true;
+  if ((!okLlm && s.provider === 'llm') || (!okLibre && s.libreUrl) || (!okGoogle && s.googleUrl)) {
     setSaveHint('未授予访问该接口地址的权限，对应翻译源可能失败。', 'err');
   }
   await chrome.storage.sync.set(s);
@@ -147,6 +150,7 @@ async function init() {
   $('youdaoAppSecret').value = settings.youdaoAppSecret || '';
   $('libreUrl').value = settings.libreUrl || '';
   $('libreKey').value = settings.libreKey || '';
+  $('googleUrl').value = settings.googleUrl || '';
 
   $('saveBtn').addEventListener('click', async () => {
     try {
