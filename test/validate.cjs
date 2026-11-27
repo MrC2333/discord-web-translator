@@ -153,6 +153,19 @@ check('Telegram K/A 选择器与模拟页一致', () => {
   return 'K/A 一致';
 });
 
+check('浏览器内置翻译（离线）已接入', () => {
+  const js = fs.readFileSync(path.join(ROOT, 'content/content.js'), 'utf8');
+  const langs = fs.readFileSync(path.join(ROOT, 'shared/langs.js'), 'utf8');
+  must(js.includes('Translator.availability'), '内容脚本未接入 Translator API');
+  must(js.includes('Translator.create'), '内容脚本缺少 Translator.create');
+  must(js.includes('downloadBuiltinPack'), '缺少内置语言包下载逻辑');
+  must(js.includes('dxt-builtin-prompt'), '缺少内置翻译下载提示');
+  must(/value: 'builtin'/.test(langs), 'provider 列表缺少 builtin');
+  const mock = fs.readFileSync(path.join(ROOT, 'test/mock-builtin.html'), 'utf8');
+  must(mock.includes('Translator'), '内置翻译模拟页缺少 Translator 桩');
+  return 'builtin 已接入';
+});
+
 console.log('');
 for (const c of checks) {
   console.log((c.ok ? '✓ ' : '✗ ') + c.name + (c.detail ? ' — ' + c.detail : ''));

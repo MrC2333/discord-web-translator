@@ -247,3 +247,31 @@
   word-break: break-word;
   user-select: text;
 }
+
+/* 内置翻译（离线包）下载提示 */
+#dxt-builtin-prompt {
+  position: fixed;
+  right: 20px;
+  bottom: 84px;
+  z-index: 2147483000;
+  width: 300px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #1e1f22;
+  color: #e6e8ea;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+  font: 13px/1.5 'Segoe UI', 'Microsoft YaHei', sans-serif;
+}
+#dxt-builtin-prompt .dxt-bp-tip { margin-bottom: 10px; }
+#dxt-builtin-prompt .dxt-bp-btn {
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: #5865f2;
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}
+#dxt-builtin-prompt .dxt-bp-btn:disabled { opacity: 0.7; cursor: default; }

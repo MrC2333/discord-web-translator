@@ -878,7 +878,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true; // 异步响应
   }
   if (msg.type === 'ping') {
-    sendResponse({ ok: true, version: '1.4.7' });
+    sendResponse({ ok: true, version: '1.4.8' });
     return;
   }
   if (msg.type === 'reset-health') {

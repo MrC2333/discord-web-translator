@@ -241,7 +241,7 @@
       active++;
       (async () => {
         try {
-          const res = await requestViaBackground(job.text);
+          const res = await translateAnywhere(job.text);
           job.resolve(res);
         } catch (e) {
           job.resolve({ ok: false, error: String((e && e.message) || e) });
@@ -289,6 +289,194 @@
         finish({ ok: false, error: '扩展已更新，请刷新页面' });
       }
     });
+  }
+
+  /* ---------------- 浏览器内置翻译（端侧，免 Key、可离线） ---------------- */
+  // Chrome/Edge 138+ 自带 Translator API；语言包下载需要一次用户手势，
+  // 下载完成后完全离线可用，适合「所有网络翻译源都不可用」的场景。
+  const BUILTIN_TRANSLATORS = new Map(); // `${src}>${tgt}` -> Promise<Translator>
+  const BUILTIN_AVAIL = new Map(); // `${src}>${tgt}` -> { state, at }
+  let builtinDetector = null;
+  let lastBuiltinPair = null;
+
+  function builtinSupported() {
+    return typeof Translator !== 'undefined';
+  }
+
+  function builtinTargetLang() {
+    const t = String(settings.target || 'zh-CN');
+    if (t === 'zh-TW' || t === 'zh-Hant') return 'zh-Hant';
+    return t.split('-')[0];
+  }
+
+  /** 粗略按文字脚本判断语种（LanguageDetector 不可用时兜底） */
+  function guessLangByScript(text) {
+    const c = scriptCounts(text);
+    if (c.kana > 0) return 'ja';
+    if (c.hangul > 0) return 'ko';
+    if (c.cyrillic > 0) return 'ru';
+    if (c.arabic > 0) return 'ar';
+    if (c.thai > 0) return 'th';
+    if (c.devanagari > 0) return 'hi';
+    if (c.cjk > 0) return 'zh';
+    return 'en';
+  }
+
+  async function detectLangForBuiltin(text) {
+    if (typeof LanguageDetector !== 'undefined') {
+      try {
+        if (!builtinDetector) builtinDetector = LanguageDetector.create();
+        const d = await builtinDetector;
+        const res = await d.detect(text.slice(0, 400));
+        const top = res && res[0];
+        if (top && top.detectedLanguage && top.detectedLanguage !== 'und') {
+          return String(top.detectedLanguage).split('-')[0];
+        }
+      } catch {
+        builtinDetector = null; // 检测器不可用，退回脚本判断
+      }
+    }
+    return guessLangByScript(text);
+  }
+
+  async function builtinAvailability(src, tgt) {
+    const key = src + '>' + tgt;
+    const hit = BUILTIN_AVAIL.get(key);
+    if (hit && (hit.state === 'available' || Date.now() - hit.at < 60000)) return hit.state;
+    let state = 'unavailable';
+    try {
+      state = await Translator.availability({ sourceLanguage: src, targetLanguage: tgt });
+    } catch {
+      state = 'unavailable';
+    }
+    BUILTIN_AVAIL.set(key, { state, at: Date.now() });
+    return state;
+  }
+
+  async function getBuiltinTranslator(src, tgt) {
+    const key = src + '>' + tgt;
+    let p = BUILTIN_TRANSLATORS.get(key);
+    if (!p) {
+      p = Translator.create({ sourceLanguage: src, targetLanguage: tgt });
+      BUILTIN_TRANSLATORS.set(key, p);
+      // 创建失败（需要手势/不支持）时清掉缓存，避免一直拿到 rejected promise
+      p.catch(() => BUILTIN_TRANSLATORS.delete(key));
+    }
+    return p;
+  }
+
+  function splitForBuiltin(text, max = 3000) {
+    if (text.length <= max) return [text];
+    const parts = [];
+    let rest = text;
+    while (rest.length > max) {
+      let cut = rest.lastIndexOf('\n', max);
+      if (cut < max * 0.5) cut = rest.lastIndexOf('. ', max);
+      if (cut < max * 0.5) cut = max;
+      parts.push(rest.slice(0, cut).trim());
+      rest = rest.slice(cut).trim();
+    }
+    if (rest) parts.push(rest);
+    return parts;
+  }
+
+  async function builtinTranslate(text) {
+    if (!builtinSupported()) throw new Error('当前浏览器不支持内置翻译（需要 Chrome/Edge 138+）');
+    const tgt = builtinTargetLang();
+    const src = await detectLangForBuiltin(text);
+    if (src === tgt) return { ok: true, text, lang: src, provider: 'builtin' };
+    lastBuiltinPair = { src, tgt };
+    const state = await builtinAvailability(src, tgt);
+    if (state !== 'available') {
+      const err = new Error(
+        state === 'downloadable' || state === 'downloading'
+          ? '内置翻译语言包尚未下载（点一下即可下载，之后离线可用）'
+          : '内置翻译暂不支持该语言对'
+      );
+      err.needsDownload = true;
+      err.pair = { src, tgt };
+      throw err;
+    }
+    const tr = await getBuiltinTranslator(src, tgt);
+    const chunks = splitForBuiltin(text);
+    const out = [];
+    for (const chunk of chunks) out.push(await tr.translate(chunk));
+    return { ok: true, text: out.join('\n'), lang: src, provider: 'builtin' };
+  }
+
+  /** 只能在用户点击回调里调用：下载语言包 */
+  async function downloadBuiltinPack(pair) {
+    const { src, tgt } = pair;
+    const tr = await Translator.create({ sourceLanguage: src, targetLanguage: tgt });
+    BUILTIN_TRANSLATORS.set(src + '>' + tgt, Promise.resolve(tr));
+    BUILTIN_AVAIL.set(src + '>' + tgt, { state: 'available', at: Date.now() });
+    return tr;
+  }
+
+  function showBuiltinPrompt(pair) {
+    if (document.getElementById('dxt-builtin-prompt')) return;
+    const box = document.createElement('div');
+    box.id = 'dxt-builtin-prompt';
+    const tip = document.createElement('div');
+    tip.className = 'dxt-bp-tip';
+    tip.textContent = '翻译源暂时都不可用。下载浏览器内置翻译包后，可离线翻译（只需一次）。';
+    const btn = document.createElement('button');
+    btn.className = 'dxt-bp-btn';
+    btn.textContent = '下载内置翻译包';
+    btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      btn.textContent = '下载中…';
+      try {
+        await downloadBuiltinPack(pair);
+        box.remove();
+        toast('内置翻译已就绪，正在重新翻译…');
+        // 清掉失败缓存与退避，让消息立刻用内置翻译重试
+        cache.clear();
+        inflight.clear();
+        document.querySelectorAll('[data-dxt-state="fail"]').forEach((el) => {
+          delete el.dataset.dxtState;
+          delete el.dataset.dxtFailAt;
+          delete el.dataset.dxtFails;
+        });
+        setTimeout(() => scanAll(true), 50);
+      } catch (e) {
+        btn.disabled = false;
+        btn.textContent = '重试下载';
+        toast('下载失败：' + ((e && e.message) || e));
+      }
+    });
+    box.appendChild(tip);
+    box.appendChild(btn);
+    (document.body || document.documentElement).appendChild(box);
+  }
+
+  async function translateAnywhere(text) {
+    if (settings.provider === 'builtin') {
+      try {
+        return await builtinTranslate(text);
+      } catch (e) {
+        if (e && e.needsDownload) showBuiltinPrompt(e.pair);
+        return { ok: false, error: (e && e.message) || String(e) };
+      }
+    }
+    if (settings.provider === 'auto' && builtinSupported()) {
+      // 内置翻译可用时优先：完全离线、无额度限制
+      const tgt = builtinTargetLang();
+      const src = guessLangByScript(text);
+      lastBuiltinPair = { src, tgt };
+      if (src !== tgt) {
+        try {
+          const state = await builtinAvailability(src, tgt);
+          if (state === 'available') {
+            const r = await builtinTranslate(text);
+            if (r && r.ok && r.text) return r;
+          }
+        } catch {
+          /* 内置不可用时继续走后台 */
+        }
+      }
+    }
+    return requestViaBackground(text);
   }
 
   function requestTranslation(text, priority) {
@@ -715,25 +903,7 @@
   }
 
   function translateSelection(text) {
-    return new Promise((resolve) => {
-      const timer = setTimeout(() => resolve({ ok: false, error: '翻译超时' }), REQUEST_TIMEOUT_MS);
-      try {
-        chrome.runtime.sendMessage(
-          { type: 'translate', text, provider: settings.provider, target: settings.target },
-          (res) => {
-            clearTimeout(timer);
-            if (chrome.runtime.lastError) {
-              resolve({ ok: false, error: chrome.runtime.lastError.message || '后台无响应' });
-              return;
-            }
-            resolve(res && typeof res === 'object' ? res : { ok: false, error: '后台无响应' });
-          }
-        );
-      } catch (e) {
-        clearTimeout(timer);
-        resolve({ ok: false, error: '扩展已更新，请刷新页面' });
-      }
-    });
+    return translateAnywhere(text);
   }
 
   async function copyText(t) {
@@ -1204,11 +1374,13 @@
     }
     if (consecutiveFailures >= 3 && Date.now() - lastWarnAt > 60000) {
       lastWarnAt = Date.now();
-      toast(
-        '翻译暂时失败，会自动重试：' +
-          msg.slice(0, 70) +
-          '（也可在扩展设置中更换翻译源）'
-      );
+      // 所有网络源都失败时，主动提供「离线内置翻译」的下载入口
+      if (settings.provider !== 'builtin' && builtinSupported() && lastBuiltinPair) {
+        showBuiltinPrompt(lastBuiltinPair);
+        toast('翻译源暂时不可用，可下载浏览器内置翻译包离线使用。');
+      } else {
+        toast('翻译暂时失败，会自动重试：' + msg.slice(0, 60));
+      }
     }
   }
 

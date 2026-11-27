@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>Mock Builtin Translator</title>
+  <link rel="stylesheet" href="../content/content.css" />
+  <style>
+    body { background: #313338; color: #dbdee1; font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif; padding: 20px; }
+    #message-content-1 { padding: 8px; background: #2b2d31; border-radius: 6px; max-width: 520px; }
+  </style>
+</head>
+<body>
+  <li id="chat-messages-1">
+    <div id="message-content-1">Hello from the built-in offline translator.</div>
+  </li>
+
+  <script>
+    // 模拟 Chrome 内置 Translator / LanguageDetector（语言包已就绪）
+    window.Translator = {
+      availability: async () => 'available',
+      create: async ({ sourceLanguage, targetLanguage }) => ({
+        translate: async (t) => `【内置 ${sourceLanguage}→${targetLanguage}】${t}`,
+        destroy() {},
+      }),
+    };
+    window.LanguageDetector = {
+      create: async () => ({
+        detect: async () => [{ detectedLanguage: 'en', confidence: 0.99 }],
+      }),
+    };
+  </script>
+  <script src="harness.js"></script>
+  <script src="../content/content.js"></script>
+</body>
+</html>

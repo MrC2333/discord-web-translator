@@ -24,6 +24,7 @@ window.DXT_LANGS = [
 
 window.DXT_PROVIDERS = [
   { value: 'auto', label: '自动（按可用性依次切换）' },
+  { value: 'builtin', label: '浏览器内置（离线，免 Key）' },
   { value: 'google', label: 'Google 翻译' },
   { value: 'tencent', label: '腾讯翻译君（国内可用）' },
   { value: 'bing', label: 'Bing 翻译' },

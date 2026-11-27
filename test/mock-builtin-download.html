@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>Mock Builtin - 语言包下载流程</title>
+  <link rel="stylesheet" href="../content/content.css" />
+  <style>
+    body { background: #313338; color: #dbdee1; font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif; padding: 20px; }
+    #message-content-1 { padding: 8px; background: #2b2d31; border-radius: 6px; max-width: 520px; }
+  </style>
+</head>
+<body>
+  <li id="chat-messages-1">
+    <div id="message-content-1">This message needs the offline pack.</div>
+  </li>
+
+  <script>
+    // 模拟「语言包未下载」：create 需要用户手势；下载后 marked 为 true
+    window.__packDownloaded = false;
+    window.Translator = {
+      availability: async () => (window.__packDownloaded ? 'available' : 'downloadable'),
+      create: async () => {
+        if (!window.__packDownloaded) {
+          const e = new Error('Requires a user gesture when availability is "downloadable".');
+          e.name = 'NotAllowedError';
+          throw e;
+        }
+        return { translate: async (t) => `【内置离线】${t}`, destroy() {} };
+      },
+    };
+    window.LanguageDetector = {
+      create: async () => ({ detect: async () => [{ detectedLanguage: 'en' }] }),
+    };
+  </script>
+  <script src="harness.js"></script>
+  <script>
+    // 强制使用内置翻译源
+    const __origGet = chrome.storage.sync.get;
+    chrome.storage.sync.get = async (defaults) => ({
+      ...(await __origGet(defaults)),
+      provider: 'builtin',
+      target: 'zh-CN',
+    });
+  </script>
+  <script src="../content/content.js"></script>
+</body>
+</html>
