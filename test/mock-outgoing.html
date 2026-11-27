@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>Mock Outgoing - 发送前翻译</title>
+  <style>
+    body { background: #313338; color: #dbdee1; font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif; padding: 24px; }
+    #composer { min-height: 44px; padding: 10px; background: #383a40; border-radius: 8px; max-width: 520px; outline: none; }
+    #messages { margin-top: 16px; white-space: pre-wrap; color: #8ee08e; max-width: 520px; }
+  </style>
+</head>
+<body>
+  <div id="composer" contenteditable="true" data-testid="composer"></div>
+  <div id="messages"></div>
+
+  <script>
+    // 模拟聊天框：回车把内容「发送」出去
+    const c = document.getElementById('composer');
+    const m = document.getElementById('messages');
+    c.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        const t = c.innerText.trim();
+        if (t) m.textContent += '[' + t + ']\n';
+        c.textContent = '';
+      }
+    });
+  </script>
+  <script src="harness.js"></script>
+  <script>
+    // 强制开启发送前翻译：中文 → 英文
+    const __origGet = chrome.storage.sync.get;
+    chrome.storage.sync.get = async (defaults) => ({
+      ...(await __origGet(defaults)),
+      outgoingEnabled: true,
+      outgoingTarget: 'en',
+      target: 'zh-CN',
+    });
+  </script>
+  <script src="../content/content.js"></script>
+</body>
+</html>

@@ -166,6 +166,17 @@ check('浏览器内置翻译（离线）已接入', () => {
   return 'builtin 已接入';
 });
 
+check('发送前翻译（输入框）已接入', () => {
+  const js = fs.readFileSync(path.join(ROOT, 'content/content.js'), 'utf8');
+  must(js.includes('handleOutgoingEnter'), '缺少输入框 Enter 拦截');
+  must(js.includes('outgoingEnabled'), '缺少 outgoingEnabled 设置');
+  must(js.includes('OUTGOING_PREFIX_RE'), '缺少语言前缀解析');
+  must(fs.existsSync(path.join(ROOT, 'test/mock-outgoing.html')), '缺少发送前翻译模拟页');
+  const opt = fs.readFileSync(path.join(ROOT, 'options/options.html'), 'utf8');
+  must(opt.includes('outgoingTarget'), '设置页缺少发送目标语言');
+  return 'outgoing 已接入';
+});
+
 console.log('');
 for (const c of checks) {
   console.log((c.ok ? '✓ ' : '✗ ') + c.name + (c.detail ? ' — ' + c.detail : ''));

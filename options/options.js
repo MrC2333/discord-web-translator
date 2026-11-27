@@ -20,6 +20,9 @@ const DEFAULTS = {
   skipSameLang: true,
   selectionTranslate: true,
   selectionAuto: false,
+  outgoingEnabled: false,
+  outgoingTarget: 'en',
+  outgoingKeepOriginal: false,
 };
 
 const $ = (id) => document.getElementById(id);
@@ -67,6 +70,9 @@ function readForm() {
     skipSameLang: $('skipSameLang').checked,
     selectionTranslate: $('selectionTranslate').checked,
     selectionAuto: $('selectionAuto').checked,
+    outgoingEnabled: $('outgoingEnabled').checked,
+    outgoingTarget: $('outgoingTarget').value,
+    outgoingKeepOriginal: $('outgoingKeepOriginal').checked,
   };
 }
 
@@ -146,6 +152,9 @@ async function init() {
   $('skipSameLang').checked = settings.skipSameLang !== false;
   $('selectionTranslate').checked = settings.selectionTranslate !== false;
   $('selectionAuto').checked = settings.selectionAuto === true;
+  $('outgoingEnabled').checked = settings.outgoingEnabled === true;
+  $('outgoingKeepOriginal').checked = settings.outgoingKeepOriginal === true;
+  fillSelect($('outgoingTarget'), window.DXT_LANGS, settings.outgoingTarget || 'en');
   $('llmBase').value = settings.llmBase;
   $('llmKey').value = settings.llmKey;
   $('llmModel').value = settings.llmModel;

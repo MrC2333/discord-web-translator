@@ -47,6 +47,7 @@
     ['Photo caption: the new map looks great', '图片说明：新地图看起来很棒', 'en'],
     ['Keep in mind this guy is a scam', '记住这家伙是个骗子', 'en'],
     ['This message has reactions and must still be translated.', '这条消息有反应，但仍然应该被翻译。', 'en'],
+    ['你好，世界', 'Hello, world', 'zh'],
     [
       'New patch notes are live The update brings a new map and balance changes. Read more on the website.',
       '新补丁说明已上线。本次更新带来一张新地图和平衡性调整，更多内容请见官网。',

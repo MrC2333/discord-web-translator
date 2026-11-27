@@ -44,6 +44,9 @@
     skipSameLang: true,
     selectionTranslate: true,
     selectionAuto: false,
+    outgoingEnabled: false,
+    outgoingTarget: 'en',
+    outgoingKeepOriginal: false,
   };
 
   let settings = { ...DEFAULTS };
@@ -219,8 +222,8 @@
   const FAIL_COOLDOWN_MS = 10000; // 首次失败 10 秒后重试，之后按 2 倍退避
   const REQUEST_TIMEOUT_MS = 20000;
 
-  function cacheKey(text) {
-    return `${settings.provider}|${settings.target}|${text}`;
+  function cacheKey(text, target) {
+    return `${settings.provider}|${target || settings.target}|${text}`;
   }
 
   function nextJob() {
@@ -241,7 +244,7 @@
       active++;
       (async () => {
         try {
-          const res = await translateAnywhere(job.text);
+          const res = await translateAnywhere(job.text, job.target);
           job.resolve(res);
         } catch (e) {
           job.resolve({ ok: false, error: String((e && e.message) || e) });
@@ -263,7 +266,7 @@
     }
   }
 
-  function requestViaBackground(text) {
+  function requestViaBackground(text, target) {
     return new Promise((resolve) => {
       let done = false;
       const finish = (v) => {
@@ -274,7 +277,7 @@
       const timer = setTimeout(() => finish({ ok: false, error: '翻译超时' }), REQUEST_TIMEOUT_MS);
       try {
         chrome.runtime.sendMessage(
-          { type: 'translate', text, provider: settings.provider, target: settings.target },
+          { type: 'translate', text, provider: settings.provider, target: target || settings.target },
           (res) => {
             clearTimeout(timer);
             if (chrome.runtime.lastError) {
@@ -450,8 +453,9 @@
     (document.body || document.documentElement).appendChild(box);
   }
 
-  async function translateAnywhere(text) {
-    if (settings.provider === 'builtin') {
+  async function translateAnywhere(text, target) {
+    const tgtOverride = target && target !== settings.target ? target : '';
+    if (settings.provider === 'builtin' && !tgtOverride) {
       try {
         return await builtinTranslate(text);
       } catch (e) {
@@ -459,7 +463,7 @@
         return { ok: false, error: (e && e.message) || String(e) };
       }
     }
-    if (settings.provider === 'auto' && builtinSupported()) {
+    if (settings.provider === 'auto' && builtinSupported() && !tgtOverride) {
       // 内置翻译可用时优先：完全离线、无额度限制
       const tgt = builtinTargetLang();
       const src = guessLangByScript(text);
@@ -476,17 +480,17 @@
         }
       }
     }
-    return requestViaBackground(text);
+    return requestViaBackground(text, tgtOverride || undefined);
   }
 
-  function requestTranslation(text, priority) {
-    const key = cacheKey(text);
+  function requestTranslation(text, priority, target) {
+    const key = cacheKey(text, target);
     const hit = cache.get(key);
     if (hit && (hit.ok || Date.now() - hit.at < FAIL_COOLDOWN_MS)) return Promise.resolve(hit);
     if (inflight.has(key)) return inflight.get(key);
 
     const p = new Promise((resolve) => {
-      const job = { text, resolve };
+      const job = { text, target, resolve };
       if (priority) QUEUE_HI.push(job);
       else QUEUE_LO.push(job);
       pump();
@@ -1405,6 +1409,138 @@
     updateFab();
   }
 
+  /* ---------------- 发送前翻译（输入框） ---------------- */
+
+  const OUTGOING_LANGS = new Set([
+    'zh', 'zh-cn', 'zh-tw', 'en', 'ja', 'ko', 'ru', 'fr', 'de', 'es', 'pt', 'it',
+    'ar', 'tr', 'th', 'vi', 'id', 'hi', 'pl', 'nl', 'uk',
+  ]);
+  const OUTGOING_PREFIX_RE = /^\s*([a-z]{2}(?:-[a-z]{2})?)\s*[:：]\s*/i;
+  let outgoingBusy = false;
+
+  function composerFromTarget(t) {
+    if (!t || t.nodeType !== 1 || !t.closest) return null;
+    const el = t.closest('[contenteditable="true"]');
+    if (!el) return null;
+    if (el.getAttribute('role') === 'searchbox') return null;
+    return el;
+  }
+
+  /** 粗略判断文字是否已经是目标语言（避免把英文再翻一遍） */
+  function looksLikeTargetLang(text, target) {
+    const c = scriptCounts(text);
+    const t = String(target || '').toLowerCase();
+    const hasLatin = c.latin > 0;
+    const noCjk = c.cjk === 0 && c.kana === 0 && c.hangul === 0;
+    if (t.startsWith('zh')) return c.cjk > 0 && c.kana === 0 && c.hangul === 0;
+    if (t.startsWith('ja')) return c.kana > 0;
+    if (t.startsWith('ko')) return c.hangul > 0;
+    if (t.startsWith('ru') || t.startsWith('uk')) return c.cyrillic > 0;
+    if (t.startsWith('ar')) return c.arabic > 0;
+    if (t.startsWith('th')) return c.thai > 0;
+    if (t.startsWith('hi')) return c.devanagari > 0;
+    // 拉丁语系（en/fr/de/es/...）：全是拉丁字母就认为已是目标语言
+    return hasLatin && noCjk && c.cyrillic === 0 && c.arabic === 0;
+  }
+
+  function sameTextClient(a, b) {
+    const n = (s) => String(s || '').replace(/\s+/g, ' ').trim().toLowerCase();
+    return n(a) === n(b);
+  }
+
+  function setComposerText(composer, text) {
+    try {
+      composer.focus();
+      const sel = window.getSelection();
+      const range = document.createRange();
+      range.selectNodeContents(composer);
+      sel.removeAllRanges();
+      sel.addRange(range);
+      if (document.execCommand('insertText', false, text)) return true;
+    } catch {
+      /* 退回直接赋值 */
+    }
+    try {
+      composer.textContent = text;
+      composer.dispatchEvent(
+        new InputEvent('input', { bubbles: true, inputType: 'insertText', data: text })
+      );
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  function sendComposer(composer) {
+    // 先置忙，确保接下来这次合成的 Enter 不会被自己再拦截一次
+    outgoingBusy = true;
+    setTimeout(() => {
+      try {
+        composer.dispatchEvent(
+          new KeyboardEvent('keydown', {
+            key: 'Enter',
+            code: 'Enter',
+            keyCode: 13,
+            which: 13,
+            bubbles: true,
+            cancelable: true,
+          })
+        );
+      } catch {
+        /* ignore */
+      }
+      setTimeout(() => {
+        outgoingBusy = false;
+      }, 300);
+    }, 30);
+  }
+
+  async function handleOutgoingEnter(e) {
+    if (e.key !== 'Enter' || e.shiftKey || e.isComposing || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (outgoingBusy) return; // 自己派发的 Enter，放行
+    if (!settings.enabled || !settings.outgoingEnabled) return;
+    const composer = composerFromTarget(e.target);
+    if (!composer) return;
+
+    const raw = composer.innerText || '';
+    const text = raw.replace(/\u200b/g, '').trim();
+    if (!text || text.length > 2000) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    let target = settings.outgoingTarget || 'en';
+    let body = text;
+    let usedPrefix = false;
+    const m = text.match(OUTGOING_PREFIX_RE);
+    if (m && OUTGOING_LANGS.has(m[1].toLowerCase())) {
+      const rest = text.slice(m[0].length).trim();
+      if (rest) {
+        target = m[1].toLowerCase();
+        body = rest;
+        usedPrefix = true;
+      }
+    }
+
+    if (looksLikeTargetLang(body, target)) {
+      // 已经是目标语言：去掉语言前缀后原样发送
+      if (usedPrefix) setComposerText(composer, body);
+      sendComposer(composer);
+      return;
+    }
+
+    outgoingBusy = true;
+    try {
+      const res = await requestTranslation(body, true, target);
+      let out = res && res.ok ? String(res.text || '') : '';
+      if (!out || sameTextClient(out, body)) out = body;
+      if (settings.outgoingKeepOriginal && out !== body) out = out + '\n' + body;
+      setComposerText(composer, out);
+    } finally {
+      sendComposer(composer);
+    }
+  }
+
   /* ---------------- 启动 ---------------- */
 
   async function init() {
@@ -1423,6 +1559,8 @@
     // 划词翻译：选中消息里的文字后出现「译」按钮（可在设置里改为选中即翻译）
     // selectionchange 在拖动过程中就会触发，先记住选区，mouseup 时即使选区被页面清掉也能用快照
     document.addEventListener('selectionchange', rememberSelection);
+    // 发送前翻译：拦截输入框里的 Enter
+    window.addEventListener('keydown', handleOutgoingEnter, true);
     window.addEventListener(
       'mouseup',
       (e) => {

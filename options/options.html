@@ -79,6 +79,35 @@
       </label>
     </section>
 
+    <section class="card" id="outgoingCard">
+      <h2>发送前翻译（输入框）</h2>
+      <p class="hint">
+        开启后，在聊天框输入母语、按回车发送前会自动翻译成下面选的语言；也可以用
+        <code>en: 你好</code> 这样的前缀临时指定目标语言。按 Shift+Enter 换行不受影响。
+      </p>
+
+      <label class="row">
+        <span class="label">开启发送前翻译</span>
+        <label class="switch">
+          <input type="checkbox" id="outgoingEnabled" />
+          <span class="slider"></span>
+        </label>
+      </label>
+
+      <label class="row">
+        <span class="label">发送目标语言</span>
+        <select id="outgoingTarget"></select>
+      </label>
+
+      <label class="row">
+        <span class="label">译文下方附带原文</span>
+        <label class="switch">
+          <input type="checkbox" id="outgoingKeepOriginal" />
+          <span class="slider"></span>
+        </label>
+      </label>
+    </section>
+
     <section class="card" id="llmCard">
       <h2>大模型翻译（推荐，质量最好）</h2>
       <p class="hint">
@@ -168,6 +197,7 @@
       <ul>
         <li>安装后打开 <b>discord.com</b> 或 <b>web.telegram.org</b> 并刷新页面即可生效；译文会显示在消息下方，点击「译」可收起。</li>
         <li>支持 Telegram Web K（<code>/k/</code>）与 Web A（<code>/a/</code>）两套界面。</li>
+        <li><b>发送前翻译</b>：在聊天框输入母语、按回车前自动翻译；可用 <code>en: 你好</code> 前缀临时指定目标语言。</li>
         <li>用鼠标选中消息里的文字，会出现「译」按钮，点一下就能翻译选中的内容（可在上方改为「选中即翻译」）。</li>
         <li>回复消息里引用的内容也会单独翻译，显示在引用行下方（Discord）。</li>
         <li>链接预览、机器人卡片里的标题和描述也会翻译，显示在卡片下方（Discord）。</li>

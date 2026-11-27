@@ -3,7 +3,7 @@
 自动识别 **Discord** 与 **Telegram 网页版**里的外语消息，并在消息下方追加译文。面向中文用户设计，默认翻译成简体中文，也可切换目标语言。
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.4.10-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-1.4.11-blue.svg)](CHANGELOG.md)
 [![Manifest V3](https://img.shields.io/badge/Manifest-V3-5865F2.svg)](manifest.json)
 
 > 支持 Chrome / Edge 等 Chromium 内核浏览器（Manifest V3）。支持 Discord 网页版、Telegram Web K（`web.telegram.org/k`）与 Web A（`web.telegram.org/a`），不适用于桌面客户端。
@@ -16,6 +16,7 @@
 
 - **双站点支持**：Discord 网页版 + Telegram Web（K / A 两套界面）
 - **自动翻译**：新消息出现即翻译，译文显示在原文下方；中文、纯 emoji、纯链接会自动跳过
+- **发送前翻译**：在聊天框输入母语、按回车发送前自动翻译成设定语言，可选附带原文；`en: 你好` 前缀可临时指定目标语言
 - **划词翻译**：用鼠标选中消息里的任意文字，点选区旁的「译」按钮即可翻译，支持复制；也可设为「选中即翻译」
 - **引用消息翻译**（Discord）：回复消息里被引用的内容会单独翻译，显示在引用行下方
 - **已编辑消息**（Discord）：带「(已编辑)」标记的消息照常翻译，标记和时间戳不会混进译文
@@ -196,7 +197,7 @@ git remote add origin https://github.com/<your-name>/discord-web-translator.git
 git push -u origin main
 ```
 
-打 Release 时，把仓库根目录打包为 `discord-translator-1.4.10.zip`（包含 `manifest.json` 及其引用文件即可）上传到 Releases。CI 会在 push/PR 时自动运行 `npm test`。
+打 Release 时，把仓库根目录打包为 `discord-translator-1.4.11.zip`（包含 `manifest.json` 及其引用文件即可）上传到 Releases。CI 会在 push/PR 时自动运行 `npm test`。
 
 ---
 
